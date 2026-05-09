@@ -355,5 +355,5 @@ The repository includes:
 
 Shiyi Li
 
-M.S. Candidate in Data Science  
-New York University
+B.S. in Mathematics–Statistics and Computer Science  
+University of Connecticut

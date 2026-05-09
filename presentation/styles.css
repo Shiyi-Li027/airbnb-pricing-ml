@@ -1,0 +1,49 @@
+.reveal {
+    font-size: 24px;  /* Adjust this number as needed */
+}
+
+.reveal h1 {
+    font-size: 2.2em;
+}
+
+.reveal h2 {
+    font-size: 2em;
+}
+
+.reveal p {
+    font-size: 1.1em;
+}
+
+.reveal code {
+  font-size: 1em;
+}
+
+.custom-plot {
+    width: 90%;
+    max-height: 500px;
+    display: block;
+    margin: auto;
+}
+
+.center {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+}
+
+.space-lg {
+    margin-top: 40px;
+}
+
+.custom-table {
+    font-size: 80%;
+    width: 70%;
+    margin: auto;
+  }
+  
+.scroll-box {
+    height: 500px;
+    overflow-y: auto;
+    padding-right: 1rem;
+}

@@ -1,0 +1,410 @@
+---
+title: "Beyond Location: Airbnb Pricing Prediction using Machine Learning and Zipcode-Level Socioeconomic Features"
+author: "Shiyi Li"
+date: "2025-04-18"
+format:
+  revealjs: 
+    embed-resources: true
+    multiplex: false
+    theme: serif
+    slide-number: true
+    preview-links: true
+    incremental: true   
+    transition: slide
+    chalkboard: false
+css: styles.css
+bibliography: references.bib # create your own bib file
+csl: apa.csl 
+cite-method: citeproc
+link-citations: true
+suppress-bibliography: false
+---
+
+## Introduction
+
+With the rapid growth of the sharing economy and changing lifestyles, such as travelling while working remotely, Airbnb has become a global leader in short-term rentals, and accurate pricing of listings is critical for hosts to remain competitive on Airbnb [@airbnbaboutus; @moomooabnb]. Therefore, this project aims to explore the key drivers of Airbnb listing prices in New York City by combining listing data with zipcode-level socioeconomic characteristics. Using a full year of Airbnb data and public datasets, we compare the performance of a multiple linear regression model (MLR) and an XGBoost model to uncover how variables such as [population density and income levels] influence rental prices. The goal is to provide hosts with interpretable, data-driven pricing insights while also contributing to predictive modeling research in the sharing economy.
+
+## About Dataset
+
+The dataset used in this project is compiled from 12 monthly Airbnb listing snapshots of New York City, covering the period from April 6, 2024, to March 1, 2025. These data are sourced from Inside Airbnb [@insideAirbnbData], each containing rich information about active rental listings during that month. The dimension of this dataset is: (452951, 79). 
+
+After the data cleaning process, the dimension of the dataset become: (152201, 80).
+
+---
+
+<div class="custom-table">
+
+| Variable                   | Description                                                                                          |
+|----------------------------|------------------------------------------------------------------------------------------------------|
+| `bathrooms`                | The number of bathrooms in the listing.                                                             |
+| `accommodates`            | The maximum capacity of the listing.                                                                |
+| `room_type`               | The room type of the listing (Entire place, Private room, Shared room).                             |
+| `borough`                 | The borough where the listing is located.                                                           |
+| `median_household_income` | Median household income in the past 12 months (in 2023 inflation-adjusted dollars).                 |
+| `minimum_nights`          | Minimum number of night stay for the listing (calendar rules may be different).                     |
+| `instant_bookable`        | Whether the guest can automatically book the listing without host approval. [t=true; f=false]       |
+| `bedrooms`                | The number of bedrooms in the listing.                                                              |
+| `property_type`           | Self-selected property type. Hotels and B&Bs are described as such by their hosts in this field.    |
+| `host_about_sentiment`    | The sentiment score of the `host_about` variable.                                                   |
+| `host_about_subjectivity` | The subjective score of the `host_about` variable.                                                  |
+| ...... | ......                                                  |
+
+</div>
+
+## Data Cleaning Process
+
+- Get the missing percentage of each variables and remove the variables that are close to completely missing ( missing percentage > 80% ).
+- Create 'account_age' variable, describing that how long has the host had their Airbnb account, in years, by subtracting 'host_since' variable from ‘last_scraped’ variable and converting the unit to years.
+- Create a new 'bathrooms' variable by extract the number of bathrooms described in the 'bathrooms_text' variable, since the original 'bathrooms' variable has more missing values than the 'bathrooms_text' variable describing the number of bathrooms. Then, remove 'bathrooms_text' variable.
+- Create 'bathroom_type' variable by comparing the number of bathrooms and the number of bedrooms from the variables 'bathrooms' and 'bedrooms'. If the number of bathrooms is smaller than the number of bedrooms, then the 'bathroom_type' has value of 'Shared bath', otherwise 'Private bath'.
+- Create 'amenities_count' and 'host_verifications_count' variables by counting the number of elements in the list of 'amenities' and 'host_verifications' variables (if len('amenities') > 2: len(x.split(',')) , otherwise 0).
+- Create 'last_review_since' by subtracting 'last_review' date from 'last_scraped' date and converting the unit to months.
+
+---
+
+- Create sentiment and subjectivity variables for the 'name', 'host_about', 'description', 'neighborhood_overview' variables by using the Sentiment Analysis (textblob & nltk packages). (NaN: 0, for all the variables)
+- Create the 'name_count', 'host_about_count', 'description_count', 'neighborhood_overview_count' variables by counting the number of words in each variables ('name', 'host_about', 'description', 'neighborhood_overview').
+- Create 'host_info' variable by combining the informations from the variables 'host_id', 'host_url', 'host_location', 'host_thumbnail_url', 'host_picture_url', 'host_has_profile_pic', 'host_identity_verified', 'host_verifications', 'host_neighbourhood', 'host_about_count', 'host_name', 'account_age' variables. 
+- Create 'listing_info' variable by combining the informations from the variables 'listing_url', 'name_count', 'description_count', 'neighborhood_overview_count', 'picture_url', variables.
+- Create 'host_in_NYC' by extracting the city from 'host_location' variable (if the string 'new york' is in the `host_location`: 't' & otherwise: 'f')
+- Generate 'zip_code' variable using the geo codes. (Since the dataset is too large and we want to merge zipcode level information from ACS data of the year of 2023 [@usCensusACS2023], we choose to generate 'zip_code' variable using the official nationwide shapefile for ZIP Code Tabulation Areas (ZCTAs) from the U.S. Census Bureau for the year 2023[@uscb_zcta2023].)
+
+---
+
+- Merge the listing data (df_2024) with the Census zip code database which contains zip-code level demographic or socioeconomic variables[@usCensusACS2023].
+- Merge the listing data (df_2024_merged) with the land area data in NYC MODZCTA shapefile from NYC Open Data.
+- Drop the unnecessary variables and all the rows with any missing values.
+
+## Data Exploratory Analysis
+
+- Does 'price' depende on 'popdensity_per_sq_mile' (number of people per square mile) ?
+
+The result of the SLR model (t-test):
+
+<div style="text-align: center;">
+  <img src="Images/SLR_popdensity_per_sq_mile.png" style="width: 45%;" />
+</div>
+
+Conclusion: By applying an SLR model (t-test) to predict the target 'price' using the only predictor 'popdensity_per_sq_mile', we can conclude that the target, `price`, is dependent on the different 'popdensity_per_sq_mile' from the result because of the small p_value (0.000) and there is a positive relationship between the target, `price`, and the predictor, 'popdensity_per_sq_mile' because of the positive coefficient of 'popdensity_per_sq_mile'.
+
+---
+
+- Does the target, `price`, depende on `median_household_income`? 
+
+The result of the SLR model (t-test):
+
+<div style="text-align: center;">
+  <img src="Images/SLR_median_household_income.png" style="width: 45%;" />
+</div>
+
+Conclusion: Applying an SLR model (t-test) to predict the target 'price' using the only predictor `median_household_income`, we can conclude that the target, `price`, is dependent on the predictor `median_household_income` from the result because of the small p_value (0.000) and there is a positive relationship between the target, `price`, and the predictor, `median_household_income` because of the positive coefficient of `median_household_income`.
+
+---
+
+- Overlay the locations of the listings on a map of NYC and visualize the average price by zipcode on a NYC choropleth map [@nycMODZCTA2024]. 
+
+::: columns
+::: column
+![Figure: Overlay the geo codes locations of all the listings on the NYC map.](Images/Overlay_Listings_on_NYCmap.png){ width=60% }
+:::
+
+::: column
+![Figure: Visualize the average price by zipcode on a NYC choropleth map.](Images/ave_price_by_zipcode.png){ width=60% }
+:::
+:::
+
+Conclusion: From these two NYC map plot, we can see the zipcode area with more listings avaliable has a higher average price for the listings, especially high average price in the Manhattan borough.
+
+---
+
+- Does the target, `price`, depende on `num_listing_by_zipcode` (the number of listings in each zip_code area) ? (Check if there are more listings in the zip code area where the listing is located, the higher the 'price' of the listing.)
+
+The result of the SLR model (t-test):
+
+<div style="text-align: center;">
+  <img src="Images/num_listing_by_zipcode.png" style="width: 45%;" />
+</div>
+
+Conclusion: By applying an SLR model (t-test) to predict the target 'price' using the only predictor `num_listing_by_zipcode`, we can conclude that the target, `price`, is dependent on the different `num_listing_by_zipcode` from the result because of the small p_value (0.000) and there is a positive relationship between the target, `price`, and the predictor, `num_listing_by_zipcode` because of the positive coefficient of `num_listing_by_zipcode`.
+
+---
+
+- Does the target, `price`, depende on the different boroughs? 
+
+::: columns
+::: column
+The boxplot of the log(price) distribution by broughs:
+
+<div style="text-align: center;">
+  <img src="Images/log(price)_by_boroughs.png" style="width: 70%;" />
+</div>
+
+:::
+
+::: column
+The result of the One-Way ANOVA test:
+
+| Statistic     | Value   |
+|---------------|---------|
+| F-statistic   | 2555.26 |
+| p-value       | 0.0000  |
+
+:::
+:::
+
+Conclusion: By applying the one-way ANOVA test (stats.f_oneway()) to test whether the mean price is significantly different between boroughs, we can conclude that the target, `price`, is dependent on the different boroughs from the result because of the small p_value (0.000). (We use a box plot of the distribution of log(price) by boroughs instead of the box plot of the distribution of price by boroughs because of the strong right skewness in the distribution of price.)
+
+---
+
+- Does the target, `price`, depende on different property types (`property_type`) ?
+
+::: columns
+::: column
+The boxplot of the log(price) distribution by property types:
+
+<div style="text-align: center;">
+  <img src="Images/boxplot_log(price)_by_property_type.png" style="width: 70%;" />
+</div>
+
+:::
+
+::: column
+The result of the One-Way ANOVA test:
+
+| Statistic     | Value   |
+|---------------|---------|
+| F-statistic   | 456.21 |
+| p-value       | 0.0000  |
+
+:::
+:::
+
+Conclusion: By applying the one-way ANOVA test (stats.f_oneway()) to test whether the mean price is significantly different between property types, we can conclude that the target, `price`, is dependent on the different property types from the result because of the small p_value (0.000).
+
+---
+
+- Does the target, `price`, depende on different property types, `room_type`?
+
+::: columns
+::: column
+The boxplot of the log(price) distribution by room types:
+
+<div style="text-align: center;">
+  <img src="Images/boxplot_room_types.png" style="width: 70%;" />
+</div>
+
+:::
+
+::: column
+The result of the One-Way ANOVA test:
+
+| Statistic     | Value   |
+|---------------|---------|
+| F-statistic   | 4350.77 |
+| p-value       | 0.0000  |
+
+:::
+:::
+
+Conclusion: By applying the one-way ANOVA test (stats.f_oneway()) to test whether the mean price is significantly different between room types, we can conclude that the target, `price`, is dependent on the different room types from the result.
+
+---
+
+- Does the target, `price`, depende on the `host_response_time`?
+
+::: columns
+::: column
+The boxplot of the log(price) distribution by property types:
+
+<div style="text-align: center;">
+  <img src="Images/boxplot_host_respponse_time.png" style="width: 70%;" />
+</div>
+
+:::
+
+::: column
+The result of the One-Way ANOVA test:
+
+| Statistic     | Value   |
+|---------------|---------|
+| F-statistic   | 356.10 |
+| p-value       | 0.0000  |
+
+:::
+:::
+
+Conclusion: Applying the one-way ANOVA test (stats.f_oneway()) to test whether the mean price is significantly different between the different `host_response_time`, we can conclude that the target, `price`, is dependent on the different `host_response_time` from the result. Even though the differences between the groups look small visually in the boxplot, the one-way ANOVA detected a statistically significant difference because, with a large dataset, even very small differences in means can become statistically significant.
+
+## Hyperparameters Tuning for XGBoost Model
+
+Since the dataset is large, GridSearchCV will be very time comsuming in this case. So, the RandomizedSearchCV was used to tune the hyperparameters for our XGBoost model but not GridSearchCV. 
+
+In the hyperparameters tuning, the XGBoost model was used to fit 10 folds for each of 30 random combinations of hyperparameters, totalling 300 fits, on the 80% training dataset. Then, the best combination of hyperparameters was found as: 
+
+| Parameter          | Value  |
+|--------------------|--------|
+| `n_estimators`     | 275    |
+| `max_depth`        | 9      |
+| `learning_rate`    | 0.22   |
+| `subsample`        | 0.72   |
+| `colsample_bytree` | 0.87   |
+
+, which has the lowest RMSE between the 300 fits on the 80% training data.
+
+---
+
+| Parameter         | What it Controls                                                                                   | Typical Range | Reason                              |
+|-------------------|----------------------------------------------------------------------------------------------------|----------------|--------------------------------------|
+| `n_estimators`     | Number of decision trees that the model will build to make its final price prediction.             | 100–300        | Balance learning and speed           |
+| `max_depth`        | The depth of each decision tree                                                                    | 3–10           | Prevent overfitting                  |
+| `learning_rate`    | Step size per decision tree                                                                        | 0.01–0.3       | Tradeoff between speed and accuracy  |
+| `subsample`        | Sample fraction per decision tree (Each tree learns from `subsample` of the listings)              | 0.7–1.0        | Randomness for robustness            |
+| `colsample_bytree` | Feature subsampling (Each tree sees `colsample_bytree` of the features to keep it balanced.)       | 0.6–1.0        | Prevents overfitting                 |
+
+## XGBoost Model Evaluation:
+
+After tunning, the best combination of hyperparameters was used to test the XGBoost model using the 20% test dataset.
+
+The result of the XGBoost model:
+
+| Metric                  | Value   |
+|--------------------------|---------|
+| MSE (on testing data)   | 5275.13  |
+| RMSE (on testing data)   | $72.63  |
+| R² Score                 | 0.8916    |
+
+The result of the XGBoost model shows that the model's price predictions are within about $72.63 of the actual Airbnb prices on average. And The model explains about 89.16% of the variance in Airbnb listing prices. This is a powerful model because the R² Score is very close to 1.
+
+## Top 15 Important variables selection:
+
+By traning the XGBoost model using the best combination of hyperparameters, the top 15 important variables was selected as:
+
+<div style="zoom: 0.75;">
+
+| Encoded Variable                                        | Original Variable           |
+|---------------------------------------------------------|-----------------------------|
+| `num_bathrooms`                                         | `bathrooms`                 |
+| `num_accommodates`                                     | `accommodates`             |
+| `cat_room_type_Private_room`                           | `room_type`                |
+| `cat_borough_Manhattan`                                | `borough`                  |
+| `num_median_household_income`                          | `median_household_income`  |
+| `num_minimum_nights`                                   | `minimum_nights`           |
+| `cat_instant_bookable_t`                               | `instant_bookable`         |
+| `num_bedrooms`                                         | `bedrooms`                 |
+| `cat_property_type_Private room in rental unit`        | `property_type`            |
+| `cat_property_type_Room in boutique hotel`             | `property_type`            |
+| `cat_property_type_Entire loft`                        | `property_type`            |
+| `cat_property_type_Entire condo`                       | `property_type`            |
+| `num_host_about_sentiment`                             | `host_about_sentiment`     |
+| `num_host_about_subjectivity`                          | `host_about_subjectivity`  |
+| `cat_property_type_Houseboat`                          | `property_type`            |
+
+</div>
+
+---
+
+<div style="text-align: center;">
+  <img src="Images/xgb_important_15.png" style="width: 60%;" />
+  <p><em>Figure: Top 15 Important Variables from XGBoost Model</em></p>
+</div>
+
+## MLR Model
+
+The same predictors as the XGBoost model were used to build an MLR model to predict `price` for the listings and train the MLR model on the 80% training data. Then, test the MLR model on the 20% testing data.
+
+Result of the MLR model:
+
+| Metric                  | Value   |
+|-------------------------|---------|
+| MSE (on testing data)   | 28574.57 |
+| RMSE (on testing data)   | $169.04   |
+| R² Score                 | 0.4129   |
+
+The result of the MLR model shows that the model’s predictions deviate from actual Airbnb prices by about $169.04 on average. And, the model explains only about 41.29% of the variance in Airbnb listing prices. 
+
+## Model Comparison
+
+::: columns
+::: column
+The result of the XGBoost model:
+
+| Metric                  | Value   |
+|--------------------------|---------|
+| MSE (on testing data)   | 5275.13  |
+| RMSE (on testing data)   | $72.63  |
+| R² Score                 | 0.8916    |
+:::
+
+::: column
+Result of the MLR model:
+
+| Metric                  | Value   |
+|-------------------------|---------|
+| MSE (on testing data)   | 28574.57 |
+| RMSE (on testing data)   | $169.04   |
+| R² Score                 | 0.4129   |
+:::
+:::
+
+Discussion: 
+
+The results of the XGBoost and MLR models show that the RMSE of XGBoost ($72.63) is much lower than that of MLR ($169.04), indicating that XGBoost’s predictions are nearly $96 more accurate, on average. The R² Score of XGBoost (0.8916) shows that it explains over 89% of the variance in prices, while MLR captures only about 41%, and over 59% of the variation remains unexplained. 
+
+This suggests that Airbnb pricing, in New York City, is influenced by complex, nonlinear relationships and interactions that XGBoost is better equipped to model. Although MLR offers interpretability, XGBoost provides much stronger predictive performance and is better suited for accurate, data-driven pricing strategies. (In other words, the XGBoost model significantly outperforms the Multivariate Linear Regression (MLR) model in predicting Airbnb listing prices in New York City.)
+
+
+## MLR model improvement
+
+- Check for Outliers or Skewed Distribution in the target, `price`.
+
+<div style="display: flex; flex-wrap: wrap; justify-content: space-around; text-align: center;">
+  <img src="Images/histogram_price.png" width="30%" style="margin: 10px;">
+  <img src="Images/boxplot_price.png" width="30%" style="margin: 10px;">
+  <img src="Images/MLR_QQ_plot.png" width="30%" style="margin: 10px;">
+  
+</div>
+
+Conclusion: The histogram of price shows that there is a strong right skew in the distribution of price. The boxplot of price shows that there are many outliers in the target, `price`. The normal QQ plot shows a significant deviation from a straight line, and the Shapiro-Wilk test gives a p-value of 0.0000, suggesting that the normality assumption may not be valid in this MLR model. Therefore, a log transformation of the target, `price`, was used to improve this MLR model. 
+
+---
+
+- After applying a log transformation to the target, `price`.
+
+<div style="display: flex; flex-wrap: wrap; justify-content: space-around; text-align: center;">
+  <img src="Images/histogram_log(price).png" width="45%" style="margin: 10px;">
+  <img src="Images/MLR_QQ_plot_log(price).png" width="45%" style="margin: 10px;">
+  
+</div>
+
+The histogram of log(price) and the normal Q–Q plot indicate that applying a log transformation to the target variable, price, improves its approximation to a normal distribution.
+
+## MLR model Interpretation {data-vertical-align="top"}
+
+::: {.scroll-box}
+To improve the previous MLR model, we build an MLR model by applying a log transformation of the target, `price`.
+
+Results of the improved MLR model:
+
+| Metric                  | Value   |
+|-------------------------|---------|
+| MSE (on testing data)   | 0.18 |
+| RMSE (on testing data)   | 0.42   |
+| R² Score                 | 0.6643   |
+
+Interpretation: This model’s . This OLS regression model demonstrates strong predictive performance with an R² of 0.672, indicating that it explains over two-thirds of the variation in Airbnb listing prices and has reasonably low prediction error (in log-price space). Significant predictors that increase price include accommodates, bathrooms, bedrooms, amenities_count, median_household_income, and being located in Manhattan (borough_Manhattan), while predictors like property_type_Private room, minimum_minimum_nights, review_scores_value, and labor_force are associated with lower prices. Many textual sentiment and count-based features (e.g., description_count, host_about_count) also show significance, highlighting the impact of listing presentation. Conversely, variables such as beds, host_verifications_count, and host_response_time_within an hour were statistically insignificant, suggesting limited pricing influence.
+:::
+
+##
+
+<div style="text-align: center; font-size: 80px; margin-top: 30vh;">
+  Thank you!
+</div>
+
+## References
+
+::: {.references}
+```{=latex}
+\nocite{*}
+```
+:::
+

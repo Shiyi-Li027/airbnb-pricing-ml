@@ -1,0 +1,188 @@
+---
+title: "Beyond Location: Airbnb Pricing Prediction using Machine Learning and Zipcode-Level Socioeconomic Features"
+author: "Shiyi Li"
+date: "2025-03-27"
+format:
+  pdf:
+    colorlinks: true
+    linkcolor: blue
+    number-sections: true
+    geometry: margin=1in
+    fontsize: 11pt 
+cite-method: citeproc
+link-citations: true
+suppress-bibliography: false
+bibliography: references.bib # create your own bib file
+csl: apa.csl
+---
+
+# Introduction
+
+With the development of science, technology, and the global economy—as well as 
+  the continued improvement in people’s quality of life—more individuals are 
+  pursuing opportunities to study, work, and travel in new environments. These 
+  lifestyle trends have driven a substantial increase in the demand for 
+  flexible housing and accelerated the expansion of the sharing economy. 
+  Airbnb, founded in 2008, exemplifies this transformation. It has grown to 
+  host over 8 million active listings across more than 220 countries and has 
+  accommodated over 2 billion guests and experience participants worldwide 
+  [@airbnbaboutus; @moomooabnb]. By connecting hosts and guests across the 
+  globe, Airbnb offers more diverse and personalized accommodation options 
+  than traditional hotels, redefining short-term rentals and increasing 
+  accessibility to housing choices.
+
+One of the key reasons for Airbnb’s success is its Smart Pricing system, which 
+  uses machine learning to recommend real-time rental prices based on a 
+  combination of property type, location, amenities, guest reviews, and local 
+  events [@clayton2024]. This dynamic pricing strategy helps align guest 
+  expectations with actual property conditions and enhances both booking 
+  conversion and user satisfaction. The ability to accurately predict rental 
+  prices has become increasingly essential for hosts to remain competitive. 
+  However, due to data limitations, this study focuses on a subset of variables 
+  that are most likely to significantly affect pricing. The goal is to help 
+  hosts better understand the market and develop more feasible pricing 
+  strategies by analyzing patterns and relationships using interpretable and 
+  predictive models.
+
+In recent years, researchers have explored various factors influencing Airbnb 
+  pricing from multiple perspectives. Prior literature has used techniques such 
+  as random forests, generalized linear models (GLM), and geographically 
+  weighted regression (GWR) to identify key determinants including superhost 
+  status, number of amenities, review scores, property type, geographic 
+  location, and review count [@kirkos2021; @zhang2017; @perezsanchez2018]. 
+  These studies highlight the spatial heterogeneity of pricing factors and 
+  underscore the importance of considering geographic variation in price 
+  modeling.
+
+Building upon these findings, this study utilizes a full year of Airbnb listing 
+  data from New York City and integrates zipcode-level socioeconomic and 
+  environmental characteristics. We compare a multivariate linear regression 
+  model with an XGBoost model to assess their effectiveness in identifying and 
+  predicting influential pricing factors. Unlike previous studies that tend to 
+  focus on a single variable dimension, this research offers a comprehensive 
+  analytical perspective across time, space, and feature dimensions. By 
+  synthesizing host, listing, rating, review, geographic, and 
+  macro-environmental data, we construct a more holistic modeling framework 
+  that provides practical pricing guidance for Airbnb hosts and contributes 
+  methodological insights for price prediction in the context of the sharing 
+  economy.
+
+# Specific Aims
+
+Does the Airbnb listing price depend on population density? Does the Airbnb 
+  listing price depend on crime rates? Does the Airbnb listing price depend on 
+  income levels? Does the Airbnb listing price depend on different boroughs? 
+  Which features are the most important in the XGBoost model? Which features 
+  are the most important in the multivariate linear regression model? Are these 
+  predictors positively or negatively associated with price? How well do a 
+  multivariate linear regression model and an XGBoost model perform in 
+  predicting price?
+
+# Data
+
+The dataset used in this project is compiled from 12 monthly Airbnb listing 
+  snapshots of New York City, covering the period from April 6, 2024 to March 
+  1, 2025. These datasets are sourced from Inside Airbnb [@insideAirbnbData], 
+  each containing rich information about active rental listings during that 
+  month. The 12 CSV files were loaded and concatenated to form a unified 
+  dataset consisting of 452,951 observations and initially 79 variables. To 
+  ensure data quality, we first checked for and removed any duplicate records. 
+  We then verified the data types of each variable and converted them into 
+  appropriate formats where necessary (e.g., converting price from string to 
+  numeric, and parsing dates like host_since to datetime format). 
+
+After examining the percentage of missing data, we removed variables with more 
+  than 80% missing values, such as calendar_updated, estimated_revenue_l365d, 
+  and license. The resulting cleaned dataset retained 73 features, including: 
+  Host information data (host_since, host_location, host_about, 
+  host_is_superhost, host_total_listings_count, etc.), Property details data 
+  (property_type, room_type, accommodates, bathrooms, bedrooms, amenities, 
+  price, etc.), Location and geographic data (latitude, longitude, 
+  neighbourhood_cleansed, and neighbourhood_group_cleansed), Review scores data 
+  (review_scores_rating, review_scores_cleanliness, review_scores_value, etc.), 
+  and Availability and review history data (availability_30, number_of_reviews, 
+  reviews_per_month, etc.)
+
+Additionally, we created two new features: host_total, derived from host_since, 
+  host_location, host_about, host_has_profile_pic, host_identity_verified, and 
+  host_total_listings_count, representing the overall completeness and activity 
+  of the host profile, and total_amenities, calculated from the amenities 
+  string to quantify the number of available amenities per listing.
+
+To supplement location-based prediction, we plan to assign zipcode values to 
+  each listing using geographic coordinates, and aggregate external 
+  zipcode-level data (e.g., income, crime rate, population density) from 
+  external public datasets. These zipcode-based features will help capture 
+  neighborhood-specific socioeconomic and environmental characteristics. This 
+  dataset is particularly suitable for the research questions proposed in this 
+  study, as it captures both listing-level and neighborhood-level variation in 
+  property and environmental characteristics across space and time.
+
+# Methods and Research Design
+
+The research design begins with data preprocessing, including removing missing 
+  values and aggregating zipcode-level variables such as income, crime rate, 
+  and population density from public datasets. Feature engineering involves 
+  constructing new features like host_total (to represent host completeness and 
+  credibility) and total_amenities (to quantify listing amenities), as well as 
+  generating zipcode information from geographic coordinates. I then implement 
+  two modeling approaches: Multivariate Linear Regression (MLR), an 
+  interpretable model that allows us to understand linear associations between 
+  predictors and the outcome (price), test the significance of variables like 
+  zipcode, and interpret coefficient direction, and XGBoost Regression, a 
+  high-performance ensemble method that can capture non-linear patterns and 
+  interactions among features, and output relative feature importance.
+
+To assess and compare model performance, we apply 10-fold cross-validation and 
+  use the following evaluation metrics: R-squared (R²), measuring how well the 
+  model explains price variation, Mean Squared Error (MSE), penalizing large 
+  prediction errors. To answer the statistical questions outlined in the 
+  Specific Aims section, we will use the following statistical methods: using 
+  simple linear regression and correlation analysis to test whether price 
+  depends on population density, using multiple linear regression with 
+  dummy-coded zipcodes to assess if zipcode is a statistically significant 
+  predictor, using t-tests or ANOVA to compare mean prices across income and 
+  crime level groups, using standardized coefficients from MLR and feature 
+  importance scores from XGBoost to identify the top 5–10 significant 
+  predictors, and using coefficient sign analysis to examine whether predictors 
+  are positively or negatively associated with price
+
+I will complement my analysis with the following visualization techniques: 
+  Using scatter plots with regression lines to visualize price and population 
+  density trends, using boxplots to show price distribution across different 
+  zipcodes and income levels, using correlation heatmaps for feature 
+  interdependence, using feature importance bar plots to highlight influential 
+  predictors from XGBoost, using residual plots and QQ plots to evaluate 
+  regression assumptions and model fit
+
+# Discussion
+
+This research can help Airbnb hosts better understand the factors that 
+  influence pricing, providing data-driven guidance for price setting. It also 
+  contributes to the broader literature on spatial pricing models and 
+  predictive analytics in the sharing economy. One of the most challenging 
+  aspects of this project is synthesizing target variables from existing data. 
+  For instance, creating the host_total feature requires combining and 
+  interpreting multiple host-related attributes such as host_since, host_about, 
+  host_location, and verification indicators. Ensuring that these derived 
+  variables are both meaningful and accurate adds complexity to the feature 
+  engineering process. Another limitation is the absence of certain potentially 
+  influential variables, such as cancellation policy, cleaning fees, or photos, 
+  due to high levels of missingness. Additionally, since this study focuses 
+  only on New York City, the findings may not generalize to Airbnb markets in 
+  other cities or regions.
+
+# References  
+
+1. [Airbnb Smart Pricing] [@clayton2024]: Maximizing your Airbnb profits using
+ smart pricing to stay flexible.
+2. [Airbnb Company Info] [@airbnbaboutus]: About us.
+3. [Airbnb on Moomoo] [@moomooabnb]: Airbnb Inc. Company Profile.
+4. [Airbnb Listings’ Performance] [@kirkos2021]: determinants and predictive 
+  models.
+5. [Key Factors Affecting Airbnb Prices] [@zhang2017]: A geographically 
+  weighted approach.
+6. [Airbnb Price Determinants Study] [@perezsanchez2018]: The what, where, and 
+  why of Airbnb price determinants.
+7. [Inside Airbnb Data Access] [@insideAirbnbData]: The official Airbnb 
+  Listings Data.

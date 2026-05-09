@@ -1,0 +1,3113 @@
+---
+title: "Final Project: Beyond Location: Unpacking Airbnb Pricing with Machine Learning and Zipcode Intelligence"
+author: "Shiyi Li"
+toc: true
+number-sections: true
+highlight-style: pygments
+format: 
+  html: 
+    code-fold: true
+    html-math-method: katex
+    embed-resources: true
+    self-contained-math: true	
+  pdf: 
+    geometry: 
+      - top=30mm
+      - left=20mm
+##  docx: Never, unless to accommodate a collaborator
+cite-method: citeproc
+link-citations: true
+suppress-bibliography: false
+bibliography: references.bib
+---
+
+
+a.  Dataset Cleaning
+        i.  Import 12 monthly New York City Airbnb rental house listing datasets from 4/6/2024 to 3/1/2025.
+
+```{python}
+import numpy as np
+import pandas as pd
+
+# Load the 12 monthly New York City Airbnb rental house listing datasets from 4/6/2024 to 3/1/2025
+df1 = pd.read_csv('../data/listings_20240406.csv', 
+                  dtype={'latitude': np.float32, 
+                        'longitude': np.float32}, 
+                  parse_dates=["last_scraped", 
+                                "host_since", 
+                                "calendar_updated", 
+                                "calendar_last_scraped", 
+                                "first_review", 
+                                "last_review"])
+df2 = pd.read_csv('../data/listings_20240503.csv', 
+                  dtype={'latitude': np.float32, 
+                        'longitude': np.float32}, 
+                  parse_dates=["last_scraped", 
+                                "host_since", 
+                                "calendar_updated", 
+                                "calendar_last_scraped", 
+                                "first_review", 
+                                "last_review"])
+df3 = pd.read_csv('../data/listings_20240604.csv', 
+                  dtype={'latitude': np.float32, 
+                        'longitude': np.float32}, 
+                  parse_dates=["last_scraped", 
+                                "host_since", 
+                                "calendar_updated", 
+                                "calendar_last_scraped", 
+                                "first_review", 
+                                "last_review"])
+df4 = pd.read_csv('../data/listings_20240705.csv', 
+                  dtype={'latitude': np.float32, 
+                        'longitude': np.float32}, 
+                  parse_dates=["last_scraped", 
+                                "host_since", 
+                                "calendar_updated", 
+                                "calendar_last_scraped", 
+                                "first_review", 
+                                "last_review"])
+df5 = pd.read_csv('../data/listings_20240805.csv', 
+                  dtype={'latitude': np.float32, 
+                        'longitude': np.float32}, 
+                  parse_dates=["last_scraped", 
+                                "host_since", 
+                                "calendar_updated", 
+                                "calendar_last_scraped", 
+                                "first_review", 
+                                "last_review"])
+df6 = pd.read_csv('../data/listings_20240904.csv', 
+                  dtype={'latitude': np.float32, 
+                        'longitude': np.float32}, 
+                  parse_dates=["last_scraped", 
+                                "host_since", 
+                                "calendar_updated", 
+                                "calendar_last_scraped", 
+                                "first_review", 
+                                "last_review"])
+df7 = pd.read_csv('../data/listings_20241004.csv', 
+                  dtype={'latitude': np.float32, 
+                        'longitude': np.float32}, 
+                  parse_dates=["last_scraped", 
+                                "host_since", 
+                                "calendar_updated", 
+                                "calendar_last_scraped", 
+                                "first_review", 
+                                "last_review"])
+df8 = pd.read_csv('../data/listings_20241104.csv', 
+                  dtype={'latitude': np.float32, 
+                        'longitude': np.float32}, 
+                  parse_dates=["last_scraped", 
+                                "host_since", 
+                                "calendar_updated", 
+                                "calendar_last_scraped", 
+                                "first_review", 
+                                "last_review"])
+df9 = pd.read_csv('../data/listings_20241204.csv', 
+                  dtype={'latitude': np.float32, 
+                        'longitude': np.float32}, 
+                  parse_dates=["last_scraped", 
+                                "host_since", 
+                                "calendar_updated", 
+                                "calendar_last_scraped", 
+                                "first_review", 
+                                "last_review"])
+df10 = pd.read_csv('../data/listings_20250103.csv', 
+                  dtype={'latitude': np.float32, 
+                        'longitude': np.float32}, 
+                  parse_dates=["last_scraped", 
+                                "host_since", 
+                                "calendar_updated", 
+                                "calendar_last_scraped", 
+                                "first_review", 
+                                "last_review"])
+df11 = pd.read_csv('../data/listings_20250201.csv', 
+                  dtype={'latitude': np.float32, 
+                        'longitude': np.float32}, 
+                  parse_dates=["last_scraped", 
+                                "host_since", 
+                                "calendar_updated", 
+                                "calendar_last_scraped", 
+                                "first_review", 
+                                "last_review"])
+df12 = pd.read_csv('../data/listings_20250301.csv', 
+                  dtype={'latitude': np.float32, 
+                        'longitude': np.float32}, 
+                  parse_dates=["last_scraped", 
+                                "host_since", 
+                                "calendar_updated", 
+                                "calendar_last_scraped", 
+                                "first_review", 
+                                "last_review"])
+
+# Combine the 12 datasets by rows
+df_2024 = pd.concat([df1, df2, df3, df4, df5, df6, df7, df8, df9, df10, df11, df12], axis=0, ignore_index=True)
+
+# Check the shape of the combined dataset, df_2024
+print(df_2024.shape)
+
+# Check the last few rows
+print(df_2024.tail(n=15))
+```
+
+        i. Rename the columns with our preferred styles.
+
+```{python}
+# Replace column names: convert to lowercase and replace spaces with underscores
+df_2024.columns = df_2024.columns.str.lower().str.replace(' ', '_')
+```
+
+        i. Get the missing percentage of each variables. Remove the variables that are close to completely missing ( > 80% missing percentage ).
+
+```{python}
+# Check for the missing percentage of each variables
+missing_percentage = (df_2024.isnull().sum()/df_2024.shape[0]*100).sort_values(ascending=False)
+
+# Print the variables with missing percentage greater than 0
+print(missing_percentage[missing_percentage > 0])
+
+# Drop the variables that are close to completely missing
+df_2024 = df_2024.drop(columns=list(missing_percentage[missing_percentage > 80].index))
+
+# Check the shape of the dataset, df_2024, after drop the variables that are close to completely missing
+df_2024.shape
+
+# Check the frist few rows
+print(df_2024.head(n=15))
+
+# Check the infomation of the dataset, df_2024
+print(df_2024.info())
+```
+
+        i. Get the basic summaries of each variables: descriptive statistics for continuous variables; frequency tables for discrete variables.
+
+```{python}
+# List all of the continuous variables
+continuous_variables = [column for column in df_2024.columns.drop(['id', 'scrape_id', 'host_id']) if df_2024[column].dtypes != 'object']
+
+# List all of the discrete variables
+discrete_variables = [column for column in df_2024.columns.drop(continuous_variables)]
+
+# Check the descriptive statistics for continuous variables
+print(df_2024[df_2024.columns.drop(['id', 'scrape_id', 'host_id'])].describe())
+
+# Check the frequency tables for discrete variables
+for column in discrete_variables:
+  print(f'Frequency tables for {column}')
+  print(f'{df_2024[column].value_counts(dropna=False).reset_index()} \n\n')
+```
+
+        i. Drop the rows with any missing value in the specific variables/columns.
+
+```{python}
+# Drop the rows with any missing value in the specific variables/columns
+df_2024.dropna(subset=['host_since', 'host_response_time', 'host_response_rate', 'host_acceptance_rate', 'host_is_superhost', 'host_total_listings_count', 'host_has_profile_pic', 'host_identity_verified', 'bathrooms_text', 'bedrooms', 'price', 'minimum_nights', 'maximum_nights', 'minimum_minimum_nights', 'maximum_minimum_nights', 'minimum_maximum_nights', 'maximum_maximum_nights', 'minimum_nights_avg_ntm', 'maximum_nights_avg_ntm', 'has_availability', 'last_review', 'review_scores_rating', 'review_scores_accuracy', 'review_scores_cleanliness', 'review_scores_checkin', 'review_scores_communication', 'review_scores_location', 'review_scores_value', 'reviews_per_month'], inplace=True)
+
+# Check the shape of the dataset, df_2024
+df_2024.shape
+
+# Check the infomation of the dataset, df_2024
+print(df_2024.info())
+
+# Need to remove the unnecessary variables: ['host_listings_count', 'neighbourhood_cleansed', 'first_review']
+# Change the name of the 'neighbourhood_group_cleansed' variable to 'borough'.
+```
+
+        i. Change the name of the 'neighbourhood_group_cleansed' variable to 'borough'.
+
+```{python}
+# Change the name of the 'neighbourhood_group_cleansed' variable to 'borough'
+df_2024.rename(columns={'neighbourhood_group_cleansed': 'borough'}, inplace=True)
+```
+
+        i. Create 'Neighborhood_highlights' variable by converting 'neighbourhood' to 'f' if 'neighbourhood' is null, otherwise 't', since 'neighbourhood' only has one possible value 'Neighborhood_highlights' and has 44.535060% missing values.
+
+```{python}
+# Create 'Neighborhood_highlights' variable by converting 'neighbourhood' to binary (NaN: 'f' & 'Neighborhood highlights': 't')
+df_2024['Neighborhood_highlights'] = df_2024['neighbourhood'].isnull().map({True: 'f', False: 't'})
+
+# Remove the 'neighbourhood' variable
+df_2024 = df_2024.drop(columns=['neighbourhood'])
+```
+
+        i. Create a new 'bathrooms' variable by extract the number of bathrooms described in the 'bathrooms_text' variable, since the original 'bathrooms' variable has more missing values than the 'bathrooms_text' variable describing the number of bathrooms. Then, remove 'bathrooms_text' variable.
+
+```{python}
+# Define a function to return the first word of 'bathrooms_text' as float data type if the first word is a float, otherwise return np.nan.
+def first_word_is_number(text):
+    try:
+        return float(text.split()[0])
+    except (ValueError, IndexError):
+        return np.nan
+
+# Create a new 'bathrooms' variable
+df_2024['bathrooms'] = df_2024['bathrooms_text'].apply(first_word_is_number)
+
+# Drop the 'bathrooms_text' column
+df_2024.drop(columns=['bathrooms_text'], inplace=True)
+
+# Drop rows where 'bathrooms' is missing
+df_2024.dropna(subset=['bathrooms'], inplace=True)
+
+# Check the shape of the dataset, df_2024
+print(df_2024.shape)
+```
+
+        i. Create 'bathroom_type' variable by comparing the number of bathrooms and the number of bedrooms from the variables 'bathrooms' and 'bedrooms'. If the number of bathrooms is smaller than the number of bedrooms, then the 'bathroom_type' has value of 'Shared bath', otherwise 'Private bath'.
+
+```{python}
+# Create a new 'bathroom_type' variable
+df_2024['bathroom_type'] = df_2024[['bathrooms', 'bedrooms']].apply(lambda row: 'Shared bath' if row['bathrooms']<row['bedrooms'] else 'Private bath', axis=1)
+```
+
+        i. Check and adjust 'beds' if 'beds' is null or the number of beds in the 'beds' variable is wrong (Ex. nonzero 'bedrooms' with zero 'beds').
+
+```{python}
+# Check for zero 'beds' with nonzero 'bedrooms'
+print(df_2024[(df_2024['beds'] == 0) & (df_2024['bedrooms'] > 0)][['beds', 'bedrooms', 'accommodates', 'room_type']])
+
+# Adjust 'beds' by corresponding 'bedrooms' if 'beds' is null or has value of zero ('beds' = 'bedrooms').
+df_2024.loc[(df_2024['beds'] == 0) | (df_2024['beds'].isnull()), 'beds'] = df_2024.loc[(df_2024['beds'] == 0) | (df_2024['beds'].isnull()), 'bedrooms']
+```
+
+        i. Create 'amenities_count' and 'host_verifications_count' variables by counting the number of elements in the list of 'amenities' and 'host_verifications' variables the data type of the 'amenities' variable to list (if len(value) > 2: len(x.split(',')) , otherwise 0)
+
+```{python}
+for column in ['amenities', 'host_verifications']:
+        # Check if the variable is missing occur
+        num_miss = df_2024[column].isnull().sum()
+        print(f"There are {num_miss} rows missing '{column}' value.")
+
+        # Create a count variable by counting the number of elements in the list value of the variable.
+        df_2024[column+'_count'] = df_2024[column].apply(lambda x: len(x.split(',')) if len(x)>2 else 0)
+
+        # Remove the original variable
+        df_2024 = df_2024.drop(columns=[column])
+
+        # Check the descriptive statistics for 'num_amenities' variables
+        print(df_2024[column+'_count'].describe(), '\n')
+```
+
+        i. Convert 'host_response_rate' variable to numeric 
+
+```{python}
+# Check if 'host_response_rate' is missing occur
+num_miss_host_response_rate = df_2024['host_response_rate'].isnull().sum()
+print(f"There are {num_miss_host_response_rate} rows missing 'host_response_rate' value.")
+
+# Convert 'host_response_rate' variable to numeric 
+df_2024['host_response_rate'] = df_2024['host_response_rate'].apply(lambda x: pd.to_numeric(x[:-1]))
+
+# Check the descriptive statistics for 'host_response_rate' variables
+print(df_2024['host_response_rate'].describe(), '\n')
+```
+
+        i. Convert 'host_acceptance_rate' variable to numeric
+
+```{python}
+# Check if 'host_acceptance_rate' is missing occur
+num_miss_host_acceptance_rate = df_2024['host_acceptance_rate'].isnull().sum()
+print(f"There are {num_miss_host_acceptance_rate} rows missing 'host_acceptance_rate' value.")
+
+# Convert 'host_acceptance_rate' variable to numeric 
+df_2024['host_acceptance_rate'] = df_2024['host_acceptance_rate'].apply(lambda x: pd.to_numeric(x[:-1]))
+
+# Check the descriptive statistics for 'host_acceptance_rate' variables
+print(df_2024['host_acceptance_rate'].describe(), '\n')
+```
+
+        i. Convert 'price' variable to numeric
+
+```{python}
+# Check if 'price' is missing occur
+num_miss_price = df_2024['price'].isnull().sum()
+print(f"There are {num_miss_price} rows missing 'price' value.")
+
+# Create a proper translation table to remove '$' and ',' characters
+remove_chars = str.maketrans({'$': '', ',': ''})
+
+# Convert 'price' variable to numeric 
+df_2024['price'] = df_2024['price'].apply(lambda x: pd.to_numeric(x.translate(remove_chars)))
+
+# Check the descriptive statistics for 'price' variables
+print(df_2024['price'].describe(), '\n')
+```
+
+        i. Create 'last_review_since' by subtracting 'last_review' date from 'last_scraped' date and converting the unit to months.
+
+```{python}
+# Calculate time since last review in months
+df_2024['last_review_since'] = (df_2024['last_scraped'] - df_2024['last_review']).dt.days / 30
+
+# Drop 'last_review' variable/column
+df_2024.drop(columns=['last_review'], inplace=True)
+```
+
+        i. Convert 'id', 'scrape_id', 'host_id' variables to string data type.
+
+```{python}
+# Convert 'id', 'scrape_id', 'host_id' variables to string data type.
+id_columns = ['id', 'scrape_id', 'host_id']
+
+for column in id_columns:
+  df_2024[column] = df_2024[column].where(df_2024[column].isnull(), df_2024[column].astype(str))  # The where(condition, other) method replaces the values of the rows where the condition evaluates to False, otherwise if the condition is true, then replace the rows with 'other'.
+
+# Check the data type of the variable
+print(df_2024[id_columns].dtypes, '\n')
+```
+
+        i. Create 'name_sentiment', 'name_subjectivity', 'host_about_sentiment', 'host_about_subjectivity', 'description_sentiment', 'description_subjectivity', 'neighborhood_overview_sentiment', and 'neighborhood_overview_subjectivity' variables by using the Sentiment Analysis on the 'name', 'host_about', 'description', 'neighborhood_overview' variables. (NaN: 0, for all the variables)
+
+```{python}
+from textblob import TextBlob
+
+import nltk
+nltk.download('averaged_perceptron_tagger')
+
+for column in ['name', 'host_about', 'description', 'neighborhood_overview']:
+
+  # Check if the variable is missing occur
+  num_miss_rows = df_2024[column].isnull().sum()
+  print(f"There are {num_miss_rows} rows missing '{column}' value.")
+
+  # Extract the sentiment score of the variable
+  df_2024[column + '_sentiment'] = df_2024[column].apply(
+      lambda x: TextBlob(str(x)).sentiment.polarity if pd.notnull(x) else 0
+      )
+
+  # Extract the subjective score of the variable
+  df_2024[column + '_subjectivity'] = df_2024[column].apply(
+      lambda x: TextBlob(str(x)).sentiment.subjectivity if pd.notnull(x) else 0
+      )
+
+  # Check the descriptive statistics for the sentiment variables
+  print(df_2024[column + '_sentiment'].describe(), '\n')
+
+  # Check the descriptive statistics for the subjective variables
+  print(df_2024[column + '_subjectivity'].describe(), '\n')
+```
+
+        i. Convert 'name', 'host_about', 'description', 'neighborhood_overview' variables to numeric by counting the number of words in each value, and store them as 'name_count', 'host_about_count', 'description_count', 'neighborhood_overview_count' variables. Remove the original variables, 'name', 'host_about', 'description', 'neighborhood_overview'.
+
+```{python}
+# Check if 'name' is missing occur
+num_miss_name = df_2024['name'].isnull().sum()
+print(f"There are {num_miss_name} rows missing 'name' value.")
+
+# Convert 'name', 'host_about', 'description', 'neighborhood_overview' variables to numeric by counting the number of words in each value
+for column in ['name', 'host_about', 'description', 'neighborhood_overview']:
+  df_2024[column+'_count'] = df_2024[column].apply(lambda x: int(len(x.split())) if pd.notnull(x) else 0)
+
+  # Drop the original variable
+  df_2024.drop(columns=[column], inplace=True)
+
+  # Check the descriptive statistics for the variables
+  print(df_2024[column+'_count'].describe(), '\n')
+```
+
+        i. Create 'account_age' variable, describing that how long has the host had their Airbnb account, in years, by subtracting 'host_since' variable from ‘last_scraped’ variable and converting the unit to years. 
+
+```{python}
+# Calculate the account age in years and stored as 'account_age' variable
+df_2024['account_age'] = (df_2024['last_scraped'] - df_2024['host_since']).dt.days / 365
+
+# Check the descriptive statistics for 'account_age' variables
+print(df_2024['account_age'].describe(), '\n')
+
+# Drop the original variable, 'host_since'.
+df_2024.drop(columns=['host_since'], inplace=True)
+```
+
+        i. Create 'host_info' variable by combining the informations from the variables 'host_id', 'host_url', 'host_location', 'host_thumbnail_url', 'host_picture_url', 'host_has_profile_pic', 'host_identity_verified', 'host_verifications', 'host_neighbourhood', 'host_about_count', 'host_name', 'account_age' variables. 
+
+```{python}
+# Create 'host_info' variable by summing up the 'account_age', np.log1p('host_about_count'), and 'host_verifications_count' variables
+df_2024['host_info'] = (
+    df_2024['account_age'] +
+    np.log1p(df_2024['host_about_count']) +
+    df_2024['host_verifications_count']
+)
+
+# Add 1 if host has profile pic or identity verified, otherwise add 0
+for column in ['host_has_profile_pic', 'host_identity_verified']:
+    df_2024['host_info'] += df_2024[column].apply(lambda x: 1 if x == 't' else 0)
+
+# Add 1 if the variable is NOT null, otherwise add 0
+for column in ['host_id', 'host_url', 'host_location', 'host_thumbnail_url', 'host_picture_url', 'host_neighbourhood', 'host_name']:
+    df_2024['host_info'] += df_2024[column].apply(lambda x: 0 if pd.isnull(x) else 1)
+
+# Check the descriptive statistics for the 'host_info' variable
+print(df_2024['host_info'].describe(), '\n')
+```
+
+        i. Create 'listing_info' variable by combining the informations from the variables 'listing_url', 'name_count', 'description_count', 'neighborhood_overview_count', 'picture_url', variables.  
+
+```{python}
+# Create 'listing_info' variable by summing up the np.log1p(df_2024['name_count']), np.log1p(df_2024['description_count']), and np.log1p(df_2024['neighborhood_overview_count']) variables
+df_2024['listing_info'] = (
+    np.log1p(df_2024['name_count']) +
+    np.log1p(df_2024['description_count']) +
+    np.log1p(df_2024['neighborhood_overview_count'])
+)
+
+# Check the descriptive statistics for the 'listing_info' variable
+print(df_2024['listing_info'].describe(), '\n')
+```
+
+        i. Create 'host_in_NYC' by extracting the city from 'host_location' variable (NYC: 't' & otherwise: 'f')
+
+```{python}
+# Create 'host_in_NYC' variable by extracting the first 2 words in the string value of the 'host_location' variable.
+df_2024['host_in_NYC'] = df_2024['host_location'].apply(
+    lambda x: 't' if isinstance(x, str) and x.lower().startswith('new york') else 'f'
+)
+
+# Check the number of unique values for the 'host_in_NYC' variable
+print(df_2024['host_in_NYC'].value_counts(), '\n')
+
+# Drop the original 'host_location' variable
+df_2024.drop(columns=['host_location'], inplace=True)
+```
+
+        i. Drop the unnecessary variables 'id', 'listing_url', 'scrape_id', 'last_scraped', 'picture_url', 'host_id', 'host_url', 'host_name', 'host_thumbnail_url', 'host_picture_url', 'host_neighbourhood', 'calendar_last_scraped', 'host_listings_count', 'neighbourhood_cleansed', and 'first_review'.
+
+```{python}
+# Drop the redundant variable 'property_type'
+df_2024 = df_2024.drop(columns=['id', 'listing_url', 'scrape_id', 'last_scraped', 'picture_url', 'host_id', 'host_url', 'host_name', 'host_thumbnail_url', 'host_picture_url', 'host_neighbourhood', 'calendar_last_scraped', 'host_listings_count', 'neighbourhood_cleansed', 'first_review'])
+```
+
+        i. Drop all the rows with any missing values.
+
+```{python}
+# Remove all the rows with any missing values
+df_2024 = df_2024.dropna()
+
+# Check the infomation of the dataset, df_2024
+print(df_2024.info())
+
+# Check the shape of the dataset, df_2024, after removed all the rows with any missing values
+print(df_2024.shape)
+```
+
+        i. Generate 'zip_code' variable using the geo codes. Since the dataset is too large and we want to merge zipcode level information from ACS data of the year of 2023, we choose to generate 'zip_code' variable using the official nationwide shapefile for ZIP Code Tabulation Areas (ZCTAs) from the U.S. Census Bureau for the year 2023.
+
+```{python}
+import requests
+import zipfile
+import os
+import io
+
+# Define the US ZIPCode shapefile URL, the official nationwide shapefile for ZIP Code Tabulation Areas (ZCTAs) from the U.S. Census Bureau for the year 2023, and extraction directory
+shapefile_url = "https://www2.census.gov/geo/tiger/TIGER2023/ZCTA520/tl_2023_us_zcta520.zip"
+extract_dir = "US_ZIPCode_Shapefile"
+
+# Create the directory if it doesn't exist
+os.makedirs(extract_dir, exist_ok=True)
+
+# Step 2: Download and extract the ZIPCode_Shapefile
+print("Downloading ZIPCode shapefile...")
+response = requests.get(shapefile_url)
+with zipfile.ZipFile(io.BytesIO(response.content), "r") as z:
+    z.extractall(extract_dir)
+
+print(f"ZIPCode_Shapefile extracted to: {extract_dir}")
+```
+
+```{python}
+# Step 2: Automatically detect the correct .shp file
+shapefile_path = None
+for file in os.listdir(extract_dir):
+    if file.endswith(".shp"):
+        shapefile_path = os.path.join(extract_dir, file)
+        break  # Use the first .shp file found
+
+if not shapefile_path:
+    raise FileNotFoundError("No .shp file found in extracted directory.")
+
+print(f"Using shapefile: {shapefile_path}")
+```
+
+```{python}
+import geopandas as gpd
+
+# Step 3: Load the shapefile into GeoPandas
+us_zipcode_shape = gpd.read_file(shapefile_path)
+
+# Step 4: Convert to CRS with latitude/longitude (WGS 84) for correct mapping
+us_zipcode_shape = us_zipcode_shape.to_crs(epsg=4326)
+
+# Preview
+us_zipcode_shape = us_zipcode_shape[['ZCTA5CE20', 'geometry']].rename(columns={'ZCTA5CE20': 'zip_code'})
+
+print(us_zipcode_shape.head(n=10))
+```
+
+```{python}
+from shapely.geometry import Point
+
+# Check if missing values in geo codes occur
+# Count rows where geo codes are missing
+geo_missing = df_2024[['latitude', 'longitude']].isnull().all(axis=1).sum()
+print(f"There are {geo_missing} rows where geo codes are missing")
+
+# Filter valid lat/lon pairs
+geo_df = df_2024[['latitude', 'longitude']].copy()
+
+# Create geometry points
+geo_df['geometry'] = geo_df.apply(lambda row: Point(row['longitude'], row['latitude']), axis=1)
+
+# Convert to GeoDataFrame
+# Make sure both datasets are in the same coordinate system (WGS 84; epsg=4326)
+geo_df = gpd.GeoDataFrame(geo_df, geometry='geometry', crs="EPSG:4326")
+```
+
+```{python}
+# Add index to keep track of rows
+geo_df['orig_index'] = geo_df.index
+
+# Perform spatial join
+matched = gpd.sjoin(geo_df, us_zipcode_shape, how='left', predicate='within')
+
+# Drop duplicates if any (based on original index)
+matched = matched.drop_duplicates(subset='orig_index')
+
+# Now `matched['zip_code']` contains the ZIP code for each coordinate
+```
+
+```{python}
+# Merge back on index instead of lat/lon
+df_2024['zip_code'] = matched.set_index('orig_index')['zip_code']
+
+# Check if missing values in 'zip_code' occur
+# Count rows where 'zip_code' are missing
+zipcode_missing = df_2024['zip_code'].isnull().sum()
+print(f"There are {zipcode_missing} rows where 'zip_code' are missing")
+```
+
+        i. Check if there is any invalid NYC zipcode.
+
+```{python}
+# Check if there is any 'zip_code' without 5 digits.
+rows_not_5_digits = df_2024[
+        ~df_2024['zip_code'].astype(str).str.match(r'^\d{5}$')]['zip_code'].count()
+print(f"There are {rows_not_5_digits} rows where 'zip_code' without 5 digits.")
+```
+
+```{python}
+# List of valid NYC ZIP codes compiled from UHF codes
+# Define all_valid_zips based on the earlier extracted ZIP codes
+all_valid_zips = {
+    10463, 10471, 10466, 10469, 10470, 10475, 10458, 10467, 10468,
+    10461, 10462, 10464, 10465, 10472, 10473, 10453, 10457, 10460,
+    10451, 10452, 10456, 10454, 10455, 10459, 10474, 11211, 11222,
+    11201, 11205, 11215, 11217, 11231, 11213, 11212, 11216, 11233,
+    11238, 11207, 11208, 11220, 11232, 11204, 11218, 11219, 11230,
+    11203, 11210, 11225, 11226, 11234, 11236, 11239, 11209, 11214,
+    11228, 11223, 11224, 11229, 11235, 11206, 11221, 11237, 10031,
+    10032, 10033, 10034, 10040, 10026, 10027, 10030, 10037, 10039,
+    10029, 10035, 10023, 10024, 10025, 10021, 10028, 10044, 10128,
+    10001, 10011, 10018, 10019, 10020, 10036, 10010, 10016, 10017,
+    10022, 10012, 10013, 10014, 10002, 10003, 10009, 10004, 10005,
+    10006, 10007, 10038, 10280, 11101, 11102, 11103, 11104, 11105,
+    11106, 11368, 11369, 11370, 11372, 11373, 11377, 11378, 11354,
+    11355, 11356, 11357, 11358, 11359, 11360, 11361, 11362, 11363,
+    11364, 11374, 11375, 11379, 11385, 11365, 11366, 11367, 11414,
+    11415, 11416, 11417, 11418, 11419, 11420, 11421, 11412, 11423,
+    11432, 11433, 11434, 11435, 11436, 11004, 11005, 11411, 11413,
+    11422, 11426, 11427, 11428, 11429, 11691, 11692, 11693, 11694,
+    11695, 11697, 10302, 10303, 10310, 10301, 10304, 10305, 10314,
+    10306, 10307, 10308, 10309, 10312
+}
+
+# Convert ZIP codes to numeric, invalid entries become NaN
+df_2024['zip_code_numeric'] = pd.to_numeric(df_2024['zip_code'], errors='coerce')
+
+# Identify invalid ZIP codes (including NaN)
+invalid_zips = df_2024[
+    df_2024['zip_code_numeric'].isna() | 
+    ~df_2024['zip_code_numeric'].isin(all_valid_zips)
+    ]['zip_code']
+
+# Calculate frequency of invalid ZIP codes
+invalid_zip_freq = invalid_zips.value_counts(dropna=False).reset_index()
+invalid_zip_freq.columns = ['zip_code', 'frequency']
+
+print(invalid_zip_freq)
+
+print(f"\nTotal number of invalid 'zip_code' values: "
+      f"{invalid_zip_freq['frequency'].sum()}")
+
+print(f"\nTotal number of illegal NYC 'zip_code' values: "
+      f"{invalid_zip_freq[1:]['frequency'].sum()}")
+```
+
+```{python}
+# Replace invalid NYC zip codes with `NA`
+df_2024.loc[
+    df_2024['zip_code_numeric'].isna() | 
+    ~df_2024['zip_code_numeric'].isin(all_valid_zips), 'zip_code'] = np.nan
+
+# Drop the 'zip_code_numeric' column
+df_2024 = df_2024.drop(columns=['zip_code_numeric'])
+```
+
+        i. Check if there is any missing value in 'borough' variable.
+
+```{python}
+# Check if missing values in 'borough' occur
+# Count rows where 'borough' are missing
+borough_missing = df_2024['borough'].isnull().sum()
+print(f"There are {borough_missing} rows where 'borough' are missing")
+```
+
+        i. Drop all the rows with any missing values.
+
+```{python}
+# Remove all the rows with any missing values
+df_2024 = df_2024.dropna()
+
+# Check the infomation of the dataset, df_2024
+print(df_2024.info())
+
+# Check the shape of the dataset, df_2024, after removed all the rows with any missing values
+print(df_2024.shape)
+```
+
+
+a.  Exploratory analysis.
+
+        i. Overlay the locations of the listings on a map of NYC and visualize the average price by zipcode on a NYC choropleth map. 
+
+```{python}
+# Load Required Libraries
+import os
+import io
+import zipfile
+import requests
+import pandas as pd
+import geopandas as gpd
+import matplotlib.pyplot as plt
+
+# Define the NYC MODZCTA shapefile URL and extraction directory
+shapefile_url = "https://data.cityofnewyork.us/api/geospatial/pri4-ifjk?method=export&format=Shapefile"
+extract_dir = "MODZCTA_Shapefile"
+
+# Create the directory if it doesn't exist
+os.makedirs(extract_dir, exist_ok=True)
+
+# Step 1: Download and extract the shapefile
+print("Downloading MODZCTA shapefile...")
+response = requests.get(shapefile_url)
+with zipfile.ZipFile(io.BytesIO(response.content), "r") as z:
+    z.extractall(extract_dir)
+
+print(f"Shapefile extracted to: {extract_dir}")
+```
+
+```{python}
+# Step 2: Automatically detect the correct .shp file
+shapefile_path = None
+for file in os.listdir(extract_dir):
+    if file.endswith(".shp"):
+        shapefile_path = os.path.join(extract_dir, file)
+        break  # Use the first .shp file found
+
+if not shapefile_path:
+    raise FileNotFoundError("No .shp file found in extracted directory.")
+
+print(f"Using shapefile: {shapefile_path}")
+
+# Step 3: Load the shapefile into GeoPandas
+gdf_nyc = gpd.read_file(shapefile_path)
+
+# Step 4: Convert to CRS with latitude/longitude (WGS 84) for correct mapping
+gdf_nyc = gdf_nyc.to_crs(epsg=4326)
+
+print(gdf_nyc.head())
+```
+
+```{python}
+# Check if missing values in geo codes occur
+# Count rows where geo codes are missing
+geo_missing = df_2024[['latitude', 'longitude']].isnull().all(axis=1).sum()
+print(f"There are {geo_missing} rows where geo codes are missing")
+
+# Remove missing values for latitude and longitude
+df_listing = df_2024.dropna(subset=['latitude', 'longitude'])
+
+# Convert to GeoDataFrame
+gdf_listing = gpd.GeoDataFrame(df_listing, geometry=gpd.points_from_xy(
+                                df_listing.longitude, 
+                                df_listing.latitude
+                                ), crs="EPSG:4326")
+
+print(gdf_listing[['price', 'zip_code', 'latitude', 'longitude']])
+```
+
+```{python}
+# Set up figure and axis
+fig, ax = plt.subplots(figsize=(10, 12))
+
+# Plot NYC boundary map
+gdf_nyc.plot(ax=ax, cmap='viridis', 
+linewidth=0.8, 
+edgecolor='black',
+legend=True, 
+label="NYC Boundaries")
+
+# Overlay listing locations as red dots
+gdf_listing.plot(
+  ax=ax, color='pink', markersize=2, alpha=0.6, label="listing Locations"
+  )
+
+# Add title and legend
+ax.set_title("Airbnb NYC listing Locations Overlay on NYC Map", fontsize=14)
+ax.legend(loc="lower right", fontsize=13)
+
+# Remove axes
+ax.set_xticks([])
+ax.set_yticks([])
+ax.set_frame_on(False)
+
+# Show plot
+plt.show()
+```
+
+```{python}
+# Calculate the mean price for each zip_code area in dollars.
+avg_price_by_zipcode = gdf_listing.groupby('zip_code')['price'].mean().reset_index()
+
+#  Merge 'avg_price_by_zipcode' directly with modzcta land area (`gdf_nyc`)
+gdf_nyc = gdf_nyc.merge(avg_price_by_zipcode, how='left', left_on='modzcta', right_on='zip_code')
+
+fig, ax = plt.subplots(figsize=(10, 12))
+gdf_nyc.plot(
+    column='price',
+    cmap="OrRd",
+    linewidth=0.8,
+    edgecolor='black',
+    legend=True,
+    legend_kwds={
+        'label': "Average Airbnb Price ($)",
+        'orientation': "horizontal"
+    },
+    ax=ax
+)
+
+ax.set_title("Average Airbnb Price by Zipcode in NYC", fontsize=14)
+ax.set_xticks([])
+ax.set_yticks([])
+ax.set_frame_on(False)
+plt.show()
+```
+
+Conclusion: From these two NYC map plot, we can see the zipcode area with more listings avaliable has a higher average price for the listings, especially high average price in the borough, Manhattan and Brooklyn.
+
+```{python}
+# Check for the value counts in the 'zip_code' variable
+print(df_2024['zip_code'].value_counts())
+
+# Check for the value counts in the 'borough' variable
+print(df_2024['borough'].value_counts())
+```
+
+```{python}
+# Count the number of listings in each zip_code area.
+listing_count_by_zipcode = df_2024['zip_code'].value_counts().reset_index()
+
+#  Merge 'listing_count_by_zipcode' directly with 'zip_code' variable in the dataframe, df_2024
+df_2024 = df_2024.merge(listing_count_by_zipcode, how='left', left_on='zip_code', right_on='zip_code')
+
+# Change the name of the 'count' variable to 'num_listing_by_zipcode'
+df_2024.rename(columns={'count': 'num_listing_by_zipcode'}, inplace=True)
+
+# Check the descriptive statistics for the 'num_listing_by_zipcode' variable
+print(df_2024['num_listing_by_zipcode'].describe(), '\n')
+
+df_2024.info()
+```
+
+###### 需要回来继续分析！！！！！！！！！！！
+
+        i. Does the target, `price`, depende on `num_listing_by_zipcode`?
+
+```{python}
+import statsmodels.api as sm
+
+X_num_listing = df_2024['num_listing_by_zipcode']
+X_num_listing = sm.add_constant(X_num_listing)
+y_price = df_2024['price']  # or log1p(price)
+
+SLR_model = sm.OLS(y_price, X_num_listing).fit()
+print(SLR_model.summary(), '\n')
+
+p_value = SLR_model.pvalues['num_listing_by_zipcode']
+
+# Interpret results
+if p_value < 0.05:
+  print(f"Because the p-value ({p_value}) is smaller than alpha (0.05), we reject the null hypothesis. This indicates a significant relationship between the target, `price`, and the `num_listing_by_zipcode`. Therefore, we can conclude that the target, `price`, depends on the `num_listing_by_zipcode`.\n")
+else:
+  print(f"Because the p-value ({p_value}) is greater than alpha (0.05), we fail to reject the null hypothesis. This indicates there is no significant relationship between the target, `price`, and the `num_listing_by_zipcode`. Therefore, we can conclude that the target, `price`, is independent of the different `num_listing_by_zipcode`.\n")
+```
+
+        i. Does the target, `price`, depende on different boroughs?
+
+```{python}
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+filtered_df = df_2024.copy()
+filtered_df['log(price)'] = np.log1p(filtered_df['price'])
+
+plt.figure(figsize=(12, 6))
+sns.boxplot(data=filtered_df, x='borough', y='log(price)')
+plt.xticks(rotation=0)
+plt.title('log(Price) Distribution by Borough')
+plt.show()
+```
+
+```{python}
+import scipy.stats as stats
+
+# Use One-Way ANOVA to test if the mean price is significantly different across boroughs. 
+# If p < 0.05: There is a significant difference in price across boroughs. = Ha
+# If p >= 0.05: No significant difference detected. = H0
+
+
+# Group prices by boroughs
+groups = [group["price"].values for name, group in df_2024.groupby("borough")]
+
+# Run ANOVA
+f_stat, p_value = stats.f_oneway(*groups)
+print(f"F-statistic: {f_stat:.2f}, p-value: {p_value:.4f}")
+
+# Interpret results
+if p_value < 0.05:
+  print(f"Because the p-value ({p_value}) is smaller than alpha (0.05), we reject the null hypothesis. This indicates a significant difference in the target, `price`, between different boroughs. Therefore, we conclude that the target, `price`, depends on the different boroughs.")
+else:
+  print(f"Because the p-value ({p_value}) is greater than alpha (0.05), we fail to reject the null hypothesis. This indicates no significant difference in the target, `price`, between different boroughs. Therefore, we conclude that the target, `price`, is independent of the different boroughs.")
+```
+
+        i. Does the target, `price`, depende on different property types, `property_type`?
+
+```{python}
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Filter out property types with very few listings if needed
+# top_types = df_2024['property_type'].value_counts().head(10).index
+filtered_df = df_2024.copy()
+
+filtered_df['log(price)'] = np.log1p(filtered_df['price'])
+
+plt.figure(figsize=(12, 6))
+sns.boxplot(data=filtered_df, x='property_type', y='log(price)')
+plt.xticks(rotation=90)
+plt.title('log(Price) Distribution by Property Type')
+plt.show()
+```
+
+```{python}
+import scipy.stats as stats
+
+# Use One-Way ANOVA to test if the mean price is significantly different across property types. 
+# If p < 0.05: There is a significant difference in price across property types. = Ha
+# If p >= 0.05: No significant difference detected. = H0
+
+
+# Filter out property types with very few listings if needed
+#top_types = df_2024['property_type'].value_counts().head(10).index
+filtered_df = df_2024.copy()
+
+# filtered_df['log(price)'] = np.log1p(filtered_df['price'])
+
+# Group prices by property_type
+groups = [group['price'].values for name, group in filtered_df.groupby("property_type")]
+
+# Run ANOVA
+f_stat, p_value = stats.f_oneway(*groups)
+print(f"F-statistic: {f_stat:.2f}, p-value: {p_value:.4f}")
+
+# Interpret results
+if p_value < 0.05:
+  print(f"Because the p-value ({p_value}) is smaller than alpha (0.05), we reject the null hypothesis. This indicates a significant difference in the target, `price`, between different property types. Therefore, we conclude that the target, `price`, depends on the different property types.")
+else:
+  print(f"Because the p-value ({p_value}) is greater than alpha (0.05), we fail to reject the null hypothesis. This indicates no significant difference in the target, `price`, between different property types. Therefore, we conclude that the target, `price`, is independent of the different property types.")
+```
+
+```{python}
+#| eval: false
+
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+
+# Step 1: Run Tukey HSD test to examine whether average prices significantly differ between each pair of property types.
+# Step 1: Run Tukey HSD test
+tukey_result = pairwise_tukeyhsd(endog=df_2024['price'], groups=df_2024['property_type'], alpha=0.05)
+
+# Step 2: Convert summary to a DataFrame
+tukey_df = pd.DataFrame(data=tukey_result._results_table.data[1:], columns=tukey_result._results_table.data[0])
+
+# Step 3: Filter rows where reject == True (i.e., significant)
+significant_diffs = tukey_df[tukey_df['reject'] == True]
+
+# Sort by mean difference (ascending)
+sorted_significant_diffs = significant_diffs.sort_values(by='meandiff', ascending=False)
+
+# Optional: Display the result
+print(sorted_significant_diffs.head(50))
+
+# Step: Get all unique property types that were in significant comparisons
+significant_groups = pd.unique(
+    pd.concat([sorted_significant_diffs['group1'], sorted_significant_diffs['group2']])
+)
+
+print(f"Total unique property types with significant price differences: {len(significant_groups)}")
+print(significant_groups)
+```
+
+        i. Does the target, `price`, depende on different room types, `room_type`?
+
+```{python}
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+filtered_df = df_2024.copy()
+
+filtered_df['log(price)'] = np.log1p(filtered_df['price'])
+
+plt.figure(figsize=(12, 6))
+sns.boxplot(data=filtered_df, x='room_type', y='log(price)')
+plt.xticks(rotation=0)
+plt.title('log(Price) Distribution by Roomy Type')
+plt.show()
+```
+
+```{python}
+import scipy.stats as stats
+
+# Use One-Way ANOVA to test if the mean price is significantly different across room types. 
+# If p < 0.05: There is a significant difference in price across room types. = Ha
+# If p >= 0.05: No significant difference detected. = H0
+
+
+# Group prices by room_type
+groups = [group["price"].values for name, group in df_2024.groupby("room_type")]
+
+# Run ANOVA
+f_stat, p_value = stats.f_oneway(*groups)
+print(f"F-statistic: {f_stat:.2f}, p-value: {p_value:.4f}")
+
+# Interpret results
+if p_value < 0.05:
+  print(f"Because the p-value ({p_value}) is smaller than alpha (0.05), we reject the null hypothesis. This indicates a significant difference in the target, `price`, between different room types. Therefore, we conclude that the target, `price`, depends on the different room types.")
+else:
+  print(f"Because the p-value ({p_value}) is greater than alpha (0.05), we fail to reject the null hypothesis. This indicates no significant difference in the target, `price`, between different room types. Therefore, we conclude that the target, `price`, is independent of the different room types.")
+```
+
+        i. Does the target, `price`, depende on the `host_response_time`?
+
+```{python}
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+filtered_df = df_2024.copy()
+
+filtered_df['log(price)'] = np.log1p(filtered_df['price'])
+
+plt.figure(figsize=(12, 6))
+
+# Boxplot showing distribution
+sns.boxplot(data=filtered_df, x='host_response_time', y='log(price)')
+
+# Overlay the mean points
+sns.pointplot(data=filtered_df, x='host_response_time', y='log(price)', 
+              estimator=np.mean, color='red', markers='D', linestyles='', ci=None)
+
+plt.xticks(rotation=0)
+plt.title('log(Price) Distribution by host_response_time')
+plt.show()
+```
+
+```{python}
+import scipy.stats as stats
+
+# Use One-Way ANOVA to test if the mean price is significantly different across 'host_response_time'. 
+# If p < 0.05: There is a significant difference in price across host_response_time. = Ha
+# If p >= 0.05: No significant difference detected. = H0
+
+
+# Group prices by host_response_time
+groups = [group["price"].values for name, group in df_2024.groupby("host_response_time")]
+
+# Run ANOVA
+f_stat, p_value = stats.f_oneway(*groups)
+print(f"F-statistic: {f_stat:.2f}, p-value: {p_value:.4f}")
+
+# Interpret results
+if p_value < 0.05:
+  print(f"Because the p-value ({p_value}) is smaller than alpha (0.05), we reject the null hypothesis. This indicates a significant difference in the target, `price`, between different `host_response_time`. Therefore, we conclude that the target, `price`, depends on the different `host_response_time`.")
+else:
+  print(f"Because the p-value ({p_value}) is greater than alpha (0.05), we fail to reject the null hypothesis. This indicates no significant difference in the target, `price`, between different `host_response_time`. Therefore, we conclude that the target, `price`, is independent of the different `host_response_time`.")
+```
+
+        i.  Merge the listing data (df_2024) with the Census zip code database which
+   contains zip-code level demographic or socioeconomic variables.
+
+```{python}
+# Import modules
+from census import Census
+from us import states
+
+api_key = open("censusAPIkey.txt").read().strip()
+c = Census(api_key)
+```
+
+```{python}
+ACS_YEAR = 2023
+ACS_DATASET = "acs/acs5"
+
+# Important ACS variables (including land area for density calculation)
+ACS_VARIABLES = {
+    "B01003_001E": "Total Population",
+    "B19013_001E": "Median Household Income",
+    "B02001_002E": "White Population",
+    "B02001_003E": "Black Population",
+    "B02001_005E": "Asian Population",
+    "B15003_022E": "Bachelor’s Degree Holders",
+    "B15003_025E": "Graduate Degree Holders",
+    "B23025_002E": "Labor Force",
+    "B23025_005E": "Unemployed",
+    "B25077_001E": "Median Home Value"
+}
+
+# Convert set to list of strings
+all_valid_zips = list(map(str, all_valid_zips))
+```
+
+```{python}
+acs_data = c.acs5.get(
+    list(ACS_VARIABLES.keys()), 
+    {'for': f'zip code tabulation area:{",".join(all_valid_zips)}'}
+    )
+
+# Convert to DataFrame
+df_acs = pd.DataFrame(acs_data)
+
+# Rename columns
+df_acs.rename(columns=ACS_VARIABLES, inplace=True)
+df_acs.rename(columns={"zip code tabulation area": "ZIP Code"}, inplace=True)
+
+# Check the data types of the columns in 'df_acs'
+print(df_acs.dtypes)
+
+# Check the data types of the columns in 'df'
+print(df_2024.dtypes)
+
+# Merge listing data (df_2024) with Census data using ZIP Code as the key
+df_2024_merged = df_2024.merge(
+  df_acs, left_on='zip_code', right_on='ZIP Code', how='left'
+  )
+
+# Count missing census data
+missing_census_data = df_2024_merged[df_2024_merged['Total Population'].isnull()]
+print("Number of crashes with missing census data:", len(missing_census_data))
+
+# Drop the redundant 'ZIP Code' variable from the dataset, df_2024_merged
+df_2024_merged.drop(columns=['ZIP Code'], inplace=True)
+
+# Check the merged dataframe
+print(df_2024_merged.head(10))
+
+# Check the infomation of the dataset, df_2024_merged
+print(df_2024_merged.info())
+```
+
+        i.  Merge the listing data (df_2024_merged) with the land area data in NYC MODZCTA shapefile from NYC Open Data.
+
+```{python}
+import requests
+import zipfile
+import geopandas as gpd
+
+# Define the NYC MODZCTA shapefile URL and extraction directory
+shapefile_url = "https://data.cityofnewyork.us/api/geospatial/pri4-ifjk?method=export&format=Shapefile"
+extract_dir = "MODZCTA_Shapefile"
+
+# Create the directory if it doesn't exist
+os.makedirs(extract_dir, exist_ok=True)
+
+# Step 1: Download and extract the shapefile
+print("Downloading MODZCTA shapefile...")
+response = requests.get(shapefile_url)
+with zipfile.ZipFile(io.BytesIO(response.content), "r") as z:
+    z.extractall(extract_dir)
+
+print(f"Shapefile extracted to: {extract_dir}")
+```
+
+```{python}
+# Step 2: Automatically detect the correct .shp file
+shapefile_path = None
+for file in os.listdir(extract_dir):
+    if file.endswith(".shp"):
+        shapefile_path = os.path.join(extract_dir, file)
+        break  # Use the first .shp file found
+
+if not shapefile_path:
+    raise FileNotFoundError("No .shp file found in extracted directory.")
+
+print(f"Using shapefile: {shapefile_path}")
+
+# Step 3: Load the shapefile into GeoPandas
+gdf = gpd.read_file(shapefile_path)
+
+# Step 4: Convert to CRS with meters for accurate area calculation
+gdf = gdf.to_crs(epsg=3857)
+
+# Step 5: Compute land area in square miles
+gdf['land_area_sq_miles'] = gdf['geometry'].area / 2_589_988.11
+# 1 square mile = 2,589,988.11 square meters
+
+print(gdf[['modzcta', 'land_area_sq_miles']].head())
+
+gdf = gdf[['modzcta', 'land_area_sq_miles']]
+```
+
+```{python}
+# Merge the listing data (df_2024_merged) directly with MODZCTA land area (`gdf`)
+df_2024_merged = df_2024_merged.merge(gdf, left_on='zip_code', right_on='modzcta', how='left')
+
+# Calculate Population Density (number of people per square mile in each zipcode area)
+df_2024_merged['popdensity_per_sq_mile'] = (
+    df_2024_merged['Total Population'] / df_2024_merged['land_area_sq_miles']
+    )
+
+# Display first few rows
+print(df_2024_merged[['zip_code', 'Total Population', 'land_area_sq_miles',
+    'popdensity_per_sq_mile']].head())
+
+# Drop the redundant 'modzcta', 'land_area_sq_miles', and 'Total Population' variables from the dataset, df_2024_merged
+df_2024_merged.drop(columns=['modzcta', 'land_area_sq_miles', 'Total Population'], inplace=True)
+```
+
+       i. Rename the columns with our preferred styles.
+
+```{python}
+# Replace column names: convert to lowercase and replace spaces with underscores
+df_2024_merged.columns = df_2024_merged.columns.str.lower().str.replace(' ', '_')
+```
+
+        i. Drop all the rows with any missing values.
+
+```{python}
+# Remove all the rows with any missing values
+df_2024_merged = df_2024_merged.dropna()
+
+# Check the infomation of the dataset, df_2024
+print(df_2024_merged.info())
+
+# Check the shape of the dataset, df_2024, after removed all the rows with any missing values
+print(df_2024_merged.shape)
+```
+
+        i. Does 'price' depende on 'popdensity_per_sq_mile' (number of people per square mile) ? (Using simple linear regression, t-test.)
+
+```{python}
+import statsmodels.api as sm
+
+X_popdensity = df_2024_merged['popdensity_per_sq_mile']
+X_popdensity = sm.add_constant(X_popdensity)
+y_price = df_2024_merged['price']  # or log1p(price)
+
+SLR_model = sm.OLS(y_price, X_popdensity).fit()
+print(SLR_model.summary())
+
+p_value = SLR_model.pvalues['popdensity_per_sq_mile']
+
+# Interpret results
+if p_value < 0.05:
+  print(f"Because the p-value ({p_value}) is smaller than alpha (0.05), we reject the null hypothesis. This indicates a significant difference in the target, `price`, between different 'popdensity_per_sq_mile'. Therefore, we conclude that the target, `price`, depends on the different 'popdensity_per_sq_mile'.")
+else:
+  print(f"Because the p-value ({p_value}) is greater than alpha (0.05), we fail to reject the null hypothesis. This indicates no significant difference in the target, `price`, between different 'popdensity_per_sq_mile'. Therefore, we conclude that the target, `price`, is independent of the predictor 'popdensity_per_sq_mile'.")
+```
+
+        i. Does 'price' depende on `median_household_income`? (Using simple linear regression, t-test.)
+
+```{python}
+import statsmodels.api as sm
+
+X_income = df_2024_merged['median_household_income']
+X_income = sm.add_constant(X_income)
+y_price = df_2024_merged['price']  # or log1p(price)
+
+SLR_model = sm.OLS(y_price, X_income).fit()
+print(SLR_model.summary())
+
+p_value = SLR_model.pvalues['median_household_income']
+
+# Interpret results
+if p_value < 0.05:
+  print(f"Because the p-value ({p_value}) is smaller than alpha (0.05), we reject the null hypothesis. This indicates a significant difference in the target, `price`, between different `median_household_income`. Therefore, we conclude that the target, `price`, depends on the different `median_household_income`.")
+else:
+  print(f"Because the p-value ({p_value}) is greater than alpha (0.05), we fail to reject the null hypothesis. This indicates no significant difference in the target, `price`, between different `median_household_income`. Therefore, we conclude that the target, `price`, is independent of the predictor `median_household_income`.")
+```
+
+        i. Merge 犯罪数据
+
+        i. 提取交通便利变量
+
+        i. 处理‘property_type’ variable. It has too much unique values. It's data type is string.
+
+
+
+a.  Modeling Airbnb price of listings in NYC.
+
+        i.  Randomly select 20% of the listings as testing data and 80% of the listings with seeds `1234`. Build a XGBoost model to predict `price` for
+      the listings with the training data. (Use RandomizedSearchCV to tune parameters but not GridSearchCV because our dataset is larger. It will be very time comsuming to use the GridSearchCV tool in this dataset. Then, we use 10-fold cross validation to do the final model evaluation/reporting after tuning.)
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import xgboost as xgb
+from sklearn.model_selection import train_test_split, RandomizedSearchCV, cross_validate
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import mean_squared_error, r2_score
+from xgboost import XGBRegressor
+from scipy.stats import uniform, randint
+
+# Sample selection of columns
+df_XGBoot_model = df_2024_merged.drop(columns=['latitude', 'longitude', 'zip_code'])
+
+# Check the dimension of the dataset, df_XGBoot_model
+print(df_XGBoot_model.shape)
+
+# Split the dataset into features (X) and target (y)
+X = df_XGBoot_model.drop(columns=['price'])  # Features
+y = df_XGBoot_model['price']  # Target variable
+
+# List all of the numerical variables
+numerical_cols = [column for column in X.columns if df_XGBoot_model[column].dtypes != 'object']
+
+# List all of the categorical variables
+categorical_cols = [column for column in X.columns if column not in numerical_cols]
+
+# Define transformations for categorical variable
+categorical_transformer = OneHotEncoder(handle_unknown='ignore', drop='first')
+
+# Define transformations for continuous variables
+numerical_transformer = StandardScaler()
+
+# Use ColumnTransformer to transform the columns
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('cat', categorical_transformer, categorical_cols),
+        ('num', numerical_transformer, numerical_cols)
+    ]
+)
+
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=1234)
+
+# Define a pipeline model, which preprocess the data and then fits a XGBoost model.
+XGBoost_model = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('regressor', XGBRegressor(
+        objective='reg:squarederror', # Regression using squared error (L2 loss). It means the model is trying to predict a continuous numeric value (like price) and minimize the sum of squared differences between predictions and actual values. This is the default for regression tasks in XGBoost.
+        eval_metric='rmse', 
+        random_state=1234
+        ))
+])
+```
+
+```{python}
+# Set hyperparameter search space
+param_dist = {
+    'regressor__n_estimators': randint(100, 300),
+    'regressor__max_depth': randint(3, 10),
+    'regressor__learning_rate': uniform(0.01, 0.3),
+    'regressor__subsample': uniform(0.7, 0.3),       # [0.7, 1.0]
+    'regressor__colsample_bytree': uniform(0.6, 0.4) # [0.6, 1.0]
+}
+
+# Run 30 random combinations of hyperparameters
+random_search = RandomizedSearchCV(
+    estimator=XGBoost_model,
+    param_distributions=param_dist,
+    n_iter=30,                       # You can increase to 50 or 100 for better tuning
+    cv=10,                           # 10-fold cross-validation
+    scoring='neg_mean_squared_error',
+    n_jobs=-1,                       # Use all CPU cores
+    verbose=1,
+    random_state=1234
+)
+
+# Fit the model to the train dataset (X_train, y_train)
+random_search.fit(X_train, y_train)
+
+# Best pipeline (preprocessing + tuned model)
+best_model = random_search.best_estimator_
+```
+
+```{python}
+# Predict 'price' on the test dataset
+y_pred = best_model.predict(X_test)
+
+# Compute RMSE and R²
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+r2 = r2_score(y_test, y_pred)
+
+# Print best parameters and performance
+print("Best Parameters Found:")
+print(random_search.best_params_)
+print(f"\n MSE (on test data): ${np.square(rmse):.2f}")
+print(f"\n RMSE (on test data): ${rmse:.2f}")
+print(f"R² Score: {r2:.4f}")
+```
+
+```{python}
+# Access trained booster from best_model
+booster = best_model.named_steps['regressor']
+fitted_preprocessor = best_model.named_steps['preprocessor']
+
+# Try to set readable feature names
+try:
+    booster.get_booster().feature_names = list(fitted_preprocessor.get_feature_names_out())
+except:
+    print("Could not set feature names from preprocessor — continuing with default names.")
+
+# Plot
+xgb.plot_importance(booster, max_num_features=15, importance_type='gain')
+plt.title("Top 15 Feature Importances (XGBoost)")
+plt.tight_layout()
+plt.show()
+```
+
+Result Interpretation: We trained a machine learning model (XGBoost) to predict Airbnb listing prices across NYC based on property features like room type, location, and reviews. We fitted 10 folds for each of 30 random combinations of hyperparameters, totalling 300 fits, and found our best combination of hyperparameters (n_estimators = 275, max_depth = 9, learning_rate = 0.22, subsample = 0.72, colsample_bytree = 0.87), which has the lowest RMSE and highest R^2 between the 300 fits. From the result, on average, the model's price predictions are within about $59 of the actual Airbnb prices. It explains 92% of the variation in price — that’s a very strong model!
+
+        i. Randomly select 20% of the listings as testing data and 80% of the listings with seeds `1234`. Build an MLR model using the same predictors as the XGBoost model to predict `price` for the listings and train the MLR model on the 80% training data.
+
+```{python}
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+
+# Sample selection of columns
+df_XGBoot_model = df_2024_merged.drop(columns=['latitude', 'longitude', 'zip_code'])
+
+# Check the dimension of the dataset, df_XGBoot_model
+print(df_XGBoot_model.shape)
+
+# Split the dataset into features (X) and target (y)
+X = df_XGBoot_model.drop(columns=['price'])  # Features
+y = df_XGBoot_model['price']  # Target variable
+
+# List all of the numerical variables
+numerical_cols = [column for column in X.columns if df_XGBoot_model[column].dtypes != 'object']
+
+# List all of the categorical variables
+categorical_cols = [column for column in X.columns if column not in numerical_cols]
+
+# Define transformations for categorical variable
+categorical_transformer = OneHotEncoder(handle_unknown='ignore', drop='first')
+
+# Define transformations for continuous variables
+numerical_transformer = StandardScaler()
+
+# Use ColumnTransformer to transform the columns
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('cat', categorical_transformer, categorical_cols),
+        ('num', numerical_transformer, numerical_cols)
+    ]
+)
+
+# Split the data into training and testing sets (在preprocessing the data 之前split train-test data，是因为standardizing，StandardScaler(), 是将数据集看作一个整体来进行standardizing 的。)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=1234)
+
+# Define a pipeline model, which preprocess the data and then fits a XGBoost model.
+MLR_model = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('regressor', LinearRegression())
+])
+
+# Fit the model to the train dataset (X_train, y_train)
+MLR_model.fit(X_train, y_train)
+```
+
+```{python}
+# Predict 'price' on the test dataset
+y_pred = MLR_model.predict(X_test)
+
+# Compute MSE, RMSE and R²
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+r2 = r2_score(y_test, y_pred)
+
+# Print MLR Model performance
+print(f"MSE: {mse:.2f}")
+print(f"RMSE: {rmse:.2f}")
+print(f"R² Score: {r2:.4f}")
+```
+
+        i. Build an OLS MLR model and check for Outliers or Skewed Distribution in the target, `price`.
+
+```{python}
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+import statsmodels.api as sm
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Sample selection of columns
+df_XGBoot_model = df_2024_merged.drop(columns=['latitude', 'longitude', 'zip_code'])
+
+# Check the dimension of the dataset, df_XGBoot_model
+print(df_XGBoot_model.shape)
+
+# Split the dataset into features (X) and target (y)
+X = df_XGBoot_model.drop(columns=['price'])  # Features
+y = df_XGBoot_model['price']  # Target variable
+
+# List all of the numerical variables
+numerical_cols = [column for column in X.columns if df_XGBoot_model[column].dtypes != 'object']
+
+# List all of the categorical variables
+categorical_cols = [column for column in X.columns if column not in numerical_cols]
+
+# Use onehot_encoding to transform the categorical variable
+X = pd.get_dummies(X, columns = categorical_cols, drop_first=True)
+X.replace({True:1, False:0}, inplace=True)
+
+# Standardize *only* numerical columns (keep dummy variables untouched)
+scaler = StandardScaler()
+X[numerical_cols] = scaler.fit_transform(X[numerical_cols])
+
+# Add intercept for OLS Regression
+X = sm.add_constant(X)
+
+# Split the data into training and testing sets.
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=1234)
+
+# Fit/train the model on 80% training data
+MLR_model = sm.OLS(y_train, X_train).fit()
+```
+
+```{python}
+# Print full summary of the MLR_model result
+print(MLR_model.summary())
+#print(summarize(MLR_model))
+
+# Predict 'price' on the 20% test data
+y_pred = MLR_model.predict(X_test)
+
+# Compute MSE, RMSE and R²
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+r2 = r2_score(y_test, y_pred)
+
+# Print MLR Model performance
+print(f"MSE (on test data): {mse:.2f}")
+print(f"RMSE (on test data): {rmse:.2f}")
+print(f"R² Score: {r2:.4f}")
+```
+
+```{python}
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Plot the distribution of price
+plt.figure(figsize=(8,5))
+sns.histplot(df_XGBoot_model['price'], bins=100, kde=True)
+plt.title('Histogram of Price')
+plt.xlabel('Price')
+plt.ylabel('Count')
+plt.show()
+
+# Plot the boxplot of price
+plt.figure(figsize=(8,2))
+sns.boxplot(x=df_XGBoot_model['price'])
+plt.title('Boxplot of Price')
+plt.show()
+```
+
+```{python}
+import scipy.stats as stats
+
+# Calculate residuals
+residuals = y_test - y_pred
+
+# Plot the Q-Q Plot
+plt.figure(figsize=(6, 6))
+sm.qqplot(residuals, line='45', fit=True)
+plt.title("Q-Q Plot of Residuals")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+from scipy.stats import shapiro
+
+stat, p = shapiro(residuals)
+print(f"Shapiro-Wilk Test p-value: {p:.4f}")
+
+if p > 0.05:
+    print("Residuals likely follow normal distribution.")
+else:
+    print("Residuals deviate from normality.")
+```
+
+Conclusion: The histogram of price shows that there is servesly right skewness on the distributiion of price. The boxplot of price shows that there are many outliers in the target, `price`. The normal QQ plot shows servesly departure from a straight line, and the Shapiro-Wilk test yields a p-value of 0.0000, suggesting that the normality assumption may not be valid in this MLR model. Therefore, log transformation on the target, `price`, was used to improve this MLR model. 
+
+        i. Apply log transformation on `price`. Print the summary results of the MLR model using log(price). Then, interpret the result:
+
+```{python}
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+import statsmodels.api as sm
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Sample selection of columns
+df_XGBoot_model = df_2024_merged.drop(columns=['latitude', 'longitude', 'zip_code'])
+
+# Check the dimension of the dataset, df_XGBoot_model
+print(df_XGBoot_model.shape)
+
+# Split the dataset into features (X) and target (y)
+X = df_XGBoot_model.drop(columns=['price'])  # Features
+y = np.log1p(df_XGBoot_model['price'])  # Target variable
+
+# List all of the numerical variables
+numerical_cols = [column for column in X.columns if df_XGBoot_model[column].dtypes != 'object']
+
+# List all of the categorical variables
+categorical_cols = [column for column in X.columns if column not in numerical_cols]
+
+# Use onehot_encoding to transform the categorical variable
+X = pd.get_dummies(X, columns = categorical_cols, drop_first=True)
+X.replace({True:1, False:0}, inplace=True)
+
+# Standardize *only* numerical columns (keep dummy variables untouched)
+scaler = StandardScaler()
+X[numerical_cols] = scaler.fit_transform(X[numerical_cols])
+
+# Add intercept for OLS Regression
+X = sm.add_constant(X)
+
+# Split the data into training and testing sets.
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=1234)
+
+# Fit/train the model on 80% training data
+MLR_model = sm.OLS(y_train, X_train).fit()
+```
+
+```{python}
+# Print full summary of the MLR_model result
+print(MLR_model.summary())
+#print(summarize(MLR_model))
+
+# Predict 'price' on the 20% test data
+y_pred = MLR_model.predict(X_test)
+
+# Compute MSE, RMSE and R²
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+r2 = r2_score(y_test, y_pred)
+
+# Print MLR Model performance
+print(f"MSE (on test data): {mse:.2f}")
+print(f"RMSE (on test data): {rmse:.2f}")
+print(f"R² Score: {r2:.4f}")
+```
+
+```{python}
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Plot the distribution of log(price)
+plt.figure(figsize=(8,5))
+sns.histplot(np.log1p(df_XGBoot_model['price']), bins=100, kde=True)
+plt.title('Log-Transformed Price Distribution')
+plt.xlabel('Log(Price + 1)')
+plt.show()
+```
+
+```{python}
+import scipy.stats as stats
+
+# Calculate residuals
+residuals = y_test - y_pred
+
+# Plot the Q-Q Plot
+plt.figure(figsize=(6, 6))
+sm.qqplot(residuals, line='45', fit=True)
+plt.title("Q-Q Plot of Residuals")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+from scipy.stats import shapiro
+
+stat, p = shapiro(residuals)
+print(f"Shapiro-Wilk Test p-value: {p:.4f}")
+
+if p > 0.05:
+    print("Residuals likely follow normal distribution.")
+else:
+    print("Residuals deviate from normality.")
+```
+
+The histogram of log(price) and the normal Q–Q plot indicate that applying a log transformation to the target variable, price, improves its approximation to a normal distribution.
+
+        i. Apply a log transformation of the target, `price`; Build a OLS model; Then check for the multicollinearity problem in this MLR model.
+
+```{python}
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+import statsmodels.api as sm
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Sample selection of columns
+df_XGBoot_model = df_2024_merged.drop(columns=['latitude', 'longitude', 'zip_code'])
+
+# Check the dimension of the dataset, df_XGBoot_model
+print(df_XGBoot_model.shape)
+
+# Split the dataset into features (X) and target (y)
+X = df_XGBoot_model.drop(columns=['price'])  # Features
+y = np.log1p(df_XGBoot_model['price'])  # Target variable
+
+# List all of the numerical variables
+numerical_cols = [column for column in X.columns if df_XGBoot_model[column].dtypes != 'object']
+
+# List all of the categorical variables
+categorical_cols = [column for column in X.columns if column not in numerical_cols]
+
+# Use onehot_encoding to transform the categorical variable
+X = pd.get_dummies(X, columns = categorical_cols, drop_first=True)
+X.replace({True:1, False:0}, inplace=True)
+
+# Standardize *only* numerical columns (keep dummy variables untouched)
+scaler = StandardScaler()
+X[numerical_cols] = scaler.fit_transform(X[numerical_cols])
+
+# Add intercept for OLS Regression
+X = sm.add_constant(X)
+
+# Split the data into training and testing sets.
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=1234)
+
+# Fit/train the model on 80% training data
+MLR_model = sm.OLS(y_train, X_train).fit()
+```
+
+```{python}
+# Print full summary of the MLR_model result
+print(MLR_model.summary())
+#print(summarize(MLR_model))
+
+# Predict 'price' on the 20% test data
+y_pred = MLR_model.predict(X_test)
+
+# Compute MSE, RMSE and R²
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+r2 = r2_score(y_test, y_pred)
+
+# Print MLR Model performance
+print(f"MSE (on test data): {mse:.2f}")
+print(f"RMSE (on test data): {rmse:.2f}")
+print(f"R² Score: {r2:.4f}")
+```
+
+```{python}
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+import pandas as pd
+
+# Ensure X_train is a DataFrame
+X_vif = X_train.copy()
+
+# Drop the intercept column if it exists
+if 'const' in X_vif.columns:
+    X_vif = X_vif.drop(columns='const')
+
+# Calculate VIF for each feature
+vif_data = pd.DataFrame()
+vif_data['feature'] = X_vif.columns
+vif_data['VIF'] = [variance_inflation_factor(X_vif.values, i) for i in range(X_vif.shape[1])]
+
+# Sort by VIF value in descending order
+vif_data = vif_data.sort_values(by='VIF', ascending=False)
+print(vif_data[vif_data["VIF"]>5], '\n')
+print(f"There are total {vif_data[vif_data["VIF"]>5].shape[0]} predictors with a VIF value greater than 5.\n")
+
+# Sort by VIF value in ascending order
+vif_data = vif_data.sort_values(by='VIF', ascending=True)
+print(vif_data[vif_data["VIF"]<=5],)
+print(f"There are total {vif_data[vif_data["VIF"]<=5].shape[0]} predictors with a VIF value less than or equal to 5.\n")
+```
+
+Conclusion: The Multicollinearity (VIF > 5) table shows that there are 85 out of 138 predictors with a VIF value greater than 5, which indicates that there are strong multicollinearity problems in this MLR model. Therefore, we use Ridge Regression (L2), a regularisation technique, to improve this model, because the number of predictors is smaller than the number of observations.
+
+       i. Apply a log transformation of the target, `price` and the Ridge Regression (L2) technique to the MLR model.
+
+```{python}
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+import statsmodels.api as sm
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Sample selection of columns
+df_XGBoot_model = df_2024_merged.drop(columns=['latitude', 'longitude', 'zip_code'])
+
+# Check the dimension of the dataset, df_XGBoot_model
+print(df_XGBoot_model.shape)
+
+# Split the dataset into features (X) and target (y)
+X = df_XGBoot_model.drop(columns=['price'])  # Features
+y = np.log1p(df_XGBoot_model['price'])  # Target variable
+
+# List all of the numerical variables
+numerical_cols = [column for column in X.columns if df_XGBoot_model[column].dtypes != 'object']
+
+# List all of the categorical variables
+categorical_cols = [column for column in X.columns if column not in numerical_cols]
+
+# Use onehot_encoding to transform the categorical variable
+X = pd.get_dummies(X, columns = categorical_cols, drop_first=True)
+X.replace({True:1, False:0}, inplace=True)
+
+# Standardize *only* numerical columns (keep dummy variables untouched)
+scaler = StandardScaler()
+X[numerical_cols] = scaler.fit_transform(X[numerical_cols])
+
+# Add intercept for OLS Regression
+X = sm.add_constant(X)
+
+# Split the data into training and testing sets.
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=1234)
+```
+
+```{python}
+from sklearn.linear_model import RidgeCV
+
+# Fit multiple linear regression with L2 regularization (Ridge) on training data
+ridge_cv = RidgeCV(alphas=np.logspace(-6, 6, 100), cv=10)
+ridge_cv.fit(X_train, y_train)
+
+# Predict on test set
+y_pred_ridge = ridge_cv.predict(X_test)
+
+# Compute MSE, RMSE and R^2 score
+mse_ridge = mean_squared_error(y_test, y_pred_ridge)
+rmse_ridge = np.sqrt(mse_ridge)
+r2_ridge = r2_score(y_test, y_pred_ridge)
+
+# Print the results
+print("Best alpha (Ridge):", ridge_cv.alpha_)
+print(f"Ridge MSE (on test data): {mse_ridge:.2f}")
+print(f"Ridge RMSE (on test data): {rmse_ridge:.2f}")
+print(f"Ridge R² Score: {r2_ridge:.4f}")
+```
+
+        i. Apply a log transformation of the target, `price`, the Elastic net Regression (L1 + L2) technique to the MLR model. 
+
+```{python}
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+import statsmodels.api as sm
+from ISLP.models import (ModelSpec as MS,
+                         summarize,
+                         poly)
+from sklearn.metrics import mean_squared_error, r2_score
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Sample selection of columns
+df_XGBoot_model = df_2024_merged.drop(columns=['latitude', 'longitude', 'zip_code'])
+
+# Check the dimension of the dataset, df_XGBoot_model
+print(df_XGBoot_model.shape)
+
+# Split the dataset into features (X) and target (y)
+X = df_XGBoot_model.drop(columns=['price'])  # Features
+y = np.log1p(df_XGBoot_model['price'])  # Target variable
+
+# List all of the numerical variables
+numerical_cols = [column for column in X.columns if df_XGBoot_model[column].dtypes != 'object']
+
+# List all of the categorical variables
+categorical_cols = [column for column in X.columns if column not in numerical_cols]
+
+# Use onehot_encoding to transform the categorical variable
+X = pd.get_dummies(X, columns = categorical_cols)
+X.replace({True:1, False:0}, inplace=True)
+
+# Add constant (column: intercept=1) column into X
+design = MS(X.columns)
+X = design.fit_transform(X)
+
+# Split the data into training and testing sets.
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=1234)
+```
+
+```{python}
+from sklearn.linear_model import ElasticNetCV
+
+# Fit multiple linear regression with L1 + L2 regularization (Elastic net: A mix of Lasso and Ridge) on training data
+elastic_cv = ElasticNetCV(l1_ratio=[.1, .5, .9], alphas=np.logspace(-6, 2, 100),
+                          cv=5, max_iter=10000, random_state=42)
+elastic_cv.fit(X_train, y_train)
+
+# Predict on test set
+y_pred_elastic = elastic_cv.predict(X_test)
+
+# Compute MSE, RMSE and R^2 score
+mse_elastic = mean_squared_error(y_test, y_pred_elastic)
+rmse_elastic = np.sqrt(mse_elastic)
+r2_elastic = r2_score(y_test, y_pred_elastic)
+
+# Print the results
+print("Best alpha (Elastic Net):", elastic_cv.alpha_)
+print("Best l1_ratio:", elastic_cv.l1_ratio_)
+print(f"Elastic Net MSE (on test data): {mse_elastic:.2f}")
+print(f"Elastic Net RMSE (on test data): {rmse_elastic:.2f}")
+print(f"Elastic Net R² Score: {r2_elastic:.4f}")
+```
+
+        i. Apply a log transformation of the target, `price`, the Lasso Regression (L1) technique to the MLR model. 
+
+```{python}
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+import statsmodels.api as sm
+from ISLP.models import (ModelSpec as MS,
+                         summarize,
+                         poly)
+from sklearn.metrics import mean_squared_error, r2_score
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Sample selection of columns
+df_XGBoot_model = df_2024_merged.drop(columns=['latitude', 'longitude', 'zip_code'])
+
+# Check the dimension of the dataset, df_XGBoot_model
+print(df_XGBoot_model.shape)
+
+# Split the dataset into features (X) and target (y)
+X = df_XGBoot_model.drop(columns=['price'])  # Features
+y = np.log1p(df_XGBoot_model['price'])  # Target variable
+
+# List all of the numerical variables
+numerical_cols = [column for column in X.columns if df_XGBoot_model[column].dtypes != 'object']
+
+# List all of the categorical variables
+categorical_cols = [column for column in X.columns if column not in numerical_cols]
+
+# Use onehot_encoding to transform the categorical variable
+X = pd.get_dummies(X, columns = categorical_cols)
+X.replace({True:1, False:0}, inplace=True)
+
+# Add constant (column: intercept=1) column into X
+design = MS(X.columns)
+X = design.fit_transform(X)
+
+# Split the data into training and testing sets.
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=1234)
+```
+
+```{python}
+from sklearn.linear_model import Lasso
+
+# Step 2: Get a lambda grid given length of lambda and min_ratio of lambda_max
+def get_lambda_l1(xs: np.ndarray, y: np.ndarray, nlambda: int, min_ratio: float):
+    ybar = np.mean(y)
+    xbar = np.mean(xs, axis=0)
+    xs_centered = xs - xbar
+    xty = np.dot(xs_centered.T, (y - ybar))
+    lmax = np.max(np.abs(xty))
+    lambdas = np.logspace(np.log10(lmax), np.log10(min_ratio * lmax),
+                              num=nlambda)
+    return lambdas
+
+# Step 3: Calculate lambda values
+nlambda = 100
+min_ratio = 1e-20
+lambda_values = get_lambda_l1(X, y, nlambda, min_ratio)
+
+# Step 5: Initialize arrays to store the coefficients and MSE for each lambda value
+coefficients = []
+mse_list = []
+
+# Step 6: Fit multiple linear regression with L1 regularization (Lasso) for each lambda value
+for lmbda in lambda_values:
+    lasso = Lasso(alpha=lmbda, max_iter=10000)
+    lasso.fit(X_train, y_train)
+    
+    # Store coefficients
+    coefficients.append(lasso.coef_)
+    
+    # Predict and calculate MSE
+    y_pred = lasso.predict(X_test)
+    mse = mean_squared_error(y_test, y_pred)
+    mse_list.append(mse)
+
+# Step 7: Convert results to DataFrame
+coef_df = pd.DataFrame(coefficients, columns=X.columns)
+mse_series = pd.Series(mse_list, index=lambda_values)
+
+# Convert list of coefficient arrays to a NumPy array
+coefficients = np.array(coefficients)
+
+# Step 7: Plot the solution path for each feature
+plt.figure(figsize=(10, 6))
+for i in range(coefficients.shape[1]):
+    plt.plot(lambda_values, coefficients[:, i], label=f'Feature {i + 1}')
+    
+plt.xscale('log')
+plt.xlabel('Lambda values (log scale)')
+plt.ylabel('Coefficient value')
+plt.title('Solution Path of MLR Lasso Regression')
+plt.grid(True)
+plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='small')
+plt.tight_layout()
+plt.show()
+
+# Find the best lambda with the lowest MSE
+best_idx = np.argmin(mse_list)
+best_lambda = lambda_values[best_idx]
+best_coef = coefficients[best_idx]
+
+print(f"Best lambda: {best_lambda:.4f}")
+
+# Refit the MLR model with the best lambda on the training data
+lasso_best = Lasso(alpha=best_lambda, max_iter=10000)
+lasso_best.fit(X_train, y_train)
+
+# Predict on test set
+y_pred_best = lasso_best.predict(X_test)
+
+# Compute MSE, RMSE and R^2 score
+mse_best = mean_squared_error(y_test, y_pred_best)
+rmse_best = np.sqrt(mse_best)
+r2_best = r2_score(y_test, y_pred_best)
+
+# Print the results
+print(f"MSE with best lambda (on test data): {mse_best:.2f}")
+print(f"RMSE with best lambda (on test data): {rmse_best:.2f}")
+print(f"R² Score with best lambda: {r2_best:.4f}")
+```
+
+Conclusion:
+By applying the Ridge Regression (L2), the Elastic net Regression (L1 + L2), and also the Lasso Regression (L1), regularisation techniques, the model has not been improved. Therefore, we try to Drop One of the Correlated Predictor from all of the Highly Correlated Predictor pairs.
+
+        i. Apply a log transformation of the target, `price` and Drop One of the Correlated Predictor from all of the Highly Correlated Predictor pairs.
+
+```{python}
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+import statsmodels.api as sm
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Sample selection of columns
+df_XGBoot_model = df_2024_merged.drop(columns=['latitude', 'longitude', 'zip_code'])
+
+# Check the dimension of the dataset, df_XGBoot_model
+print(df_XGBoot_model.shape)
+
+# Split the dataset into features (X) and target (y)
+X = df_XGBoot_model.drop(columns=['price'])  # Features
+y = np.log1p(df_XGBoot_model['price'])  # Target variable
+
+# List all of the numerical variables
+numerical_cols = [column for column in X.columns if df_XGBoot_model[column].dtypes != 'object']
+
+# List all of the categorical variables
+categorical_cols = [column for column in X.columns if column not in numerical_cols]
+
+# Use onehot_encoding to transform the categorical variable
+X = pd.get_dummies(X, columns = categorical_cols, drop_first=True)
+X.replace({True:1, False:0}, inplace=True)
+
+# Standardize *only* numerical columns (keep dummy variables untouched)
+scaler = StandardScaler()
+X[numerical_cols] = scaler.fit_transform(X[numerical_cols])
+
+# Add intercept for OLS Regression
+X = sm.add_constant(X)
+
+# Split the data into training and testing sets.
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=1234)
+
+# Fit/train the model on 80% training data
+MLR_model = sm.OLS(y_train, X_train).fit()
+```
+
+```{python}
+# Print full summary of the MLR_model result
+print(MLR_model.summary())
+
+# Predict 'price' on the 20% test data
+y_pred = MLR_model.predict(X_test)
+
+# Compute MSE, RMSE and R²
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+r2 = r2_score(y_test, y_pred)
+
+# Print MLR Model performance
+print(f"MSE (on test data): {mse:.2f}")
+print(f"RMSE (on test data): {rmse:.2f}")
+print(f"R² Score: {r2:.4f}")
+```
+
+```{python}
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+import pandas as pd
+
+# Step 1: Copy training features to check VIF
+X_vif_train = X_train.copy()
+
+# Step 2: Drop the intercept column if it exists
+if 'const' in X_vif_train.columns:
+    X_vif_train = X_vif_train.drop(columns='const')
+
+# Calculate VIF for each feature
+vif_data = pd.DataFrame()
+vif_data['feature'] = X_vif_train.columns
+vif_data['VIF'] = [variance_inflation_factor(X_vif_train.values, i) for i in range(X_vif_train.shape[1])]
+
+# Sort by VIF value
+vif_data = vif_data.sort_values(by='VIF', ascending=False)
+print(vif_data[vif_data["VIF"]>5])
+```
+
+```{python}
+# Step 3: Define and apply VIF-based feature dropping
+def drop_high_vif(df, thresh=10.0):
+    dropped = True
+    while dropped:
+        dropped = False
+        vif = pd.Series(
+            [variance_inflation_factor(df.values, i) for i in range(df.shape[1])],
+            index=df.columns
+        )
+        max_vif = vif.max()
+        if max_vif > thresh:
+            drop_col = vif.idxmax()
+            print(f"Dropping '{drop_col}' with VIF: {max_vif:.2f}")
+            df = df.drop(columns=[drop_col])
+            dropped = True
+    return df
+
+# Step 4: Reduce high-VIF features from training set
+X_vif_train_reduced = drop_high_vif(X_vif_train)
+
+# Step 5: Align test set accordingly
+X_test_reduced = X_test[X_vif_train_reduced.columns]
+
+# Step 6: Add constant term back for OLS
+X_vif_train_reduced = sm.add_constant(X_vif_train_reduced)
+X_test_reduced = sm.add_constant(X_test_reduced, has_constant='add')
+
+# Step 7: Fit the model with reduced features
+MLR_model = sm.OLS(y_train, X_vif_train_reduced).fit()
+
+# Print full summary of the MLR_model result
+print(MLR_model.summary())
+
+# Step 8: Predict and evaluate
+y_pred = MLR_model.predict(X_test_reduced)
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+r2 = r2_score(y_test, y_pred)
+
+# Step 9: Print results
+print(MLR_model.summary())
+print(f"MSE (on test data): {mse:.2f}")
+print(f"RMSE (on test data): {rmse:.2f}")
+print(f"R² Score: {r2:.4f}")
+```
+
+        i. Find the top 10 significant predictors in the MLR model.
+
+```{python}
+# Extract the regression results into a DataFrame
+summary_df = pd.DataFrame({
+    'coef': MLR_model.params,
+    'std_err': MLR_model.bse,
+    't_value': MLR_model.tvalues,
+    'p_value': MLR_model.pvalues,
+    'conf_lower': MLR_model.conf_int()[0],
+    'conf_upper': MLR_model.conf_int()[1]
+})
+
+# Sort by p-value in ascending order to find the top 10 significant predictors.
+summary_sorted = summary_df.sort_values(by='p_value', ascending=True)
+
+# Display the sorted result
+summary_sorted.head(10)  # show top 10
+```
+
+        i. Find all the insignificant predictors in the MLR model.
+
+```{python}
+# Sort by p-value in descending order to find the all the insignificant predictors.
+summary_sorted = summary_df.sort_values(by='p_value', ascending=False)
+
+# Display the sorted result
+summary_sorted.head(25)  # show top 25 insignificant predictors
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        i. 'last_scraped'的时间就是当天the listing房价所对应的当天的日期。
+
+        i. Remove the redundant ‘name’, 'host_name'，'host_id', 'id', 'scrape_id', 'host_id' variables. (Remove ‘name’, 'host_name'，'host_id' variables。根据‘calculated_host_listings_count’ variables。 用‘calculated_host_listings_count’ variables 比用'name'变量更好。)
+
+        i. 看一下能不能从 zip_code 判断出在邻近的listing有多少个来判断地理位置邻近的listing越多 (可能需要分析一下是否需要分析房价当天的日期的影响，应该不需要因为每天的房价都是不一样的，而且日期因素也会以'is_weekend_or_holiday' 的变量来表现在对于房价的预测上)，表示竞争越激烈，会不会显著影响房价。
+
+        i. Does 'price' depende on 'host_in_NYC'?
+
+        i. Does 'price' depende on ''
+
+        i. 从‘last_scraped’ date variable 中提取出 ‘is_weekend_or_holiday’ boolean variable（'if is weekend or holiday': 1 & 'if not a weekend or holiday': 0）
+
+        i. 看一下能不能从'first_review', ‘last_review’的时间分析出review的人是自由职业者，学生，还是什么等等其他的有用的信息。
+
+        i. ‘calendar_last_scraped’ 是calendar上一次的提取时间，而不是host上一次更新房子出租情况的calendar的时间。所以‘calendar_last_scraped’对于预测房价并没有用，可以考虑删除掉（因为 MLR 和 XGboot 模型不具备分析datatime variable的功能）。
+
+        i. 犯罪高峰时段（是否集中在周末夜晚）
+
+
+    a.  Exploratory analysis.
+        i.  Visualize the locations of complaints on a NYC map, with
+           different symbols for different descriptors.
+        i.  Create a variable `response_time`, which is the duration
+           from `created_date` to `closed_date`. 
+        i.  Visualize the comparison of response time by complaint
+          descriptor and borough. The original may not be the best
+          given the long tail or outlers.
+        i.  Is there significant difference in response time between SF
+           and CB complaints? Across different boroughs? Does the
+           difference between SF and CB depend on borough? State your
+           hypothesis, justify your test, and summarize your results
+           in plain English.
+        i.  Create a binary variable `over3d` to indicate that a service
+          request took three days or longer to close. 
+        i.  Does `over3d`
+          depend on the complaint descriptor, borough, or weekday (vs
+          weekend/holiday)? State your hypotheses, justify your test,
+          and summarize your results.
+    a.  Modeling the occurrence of overly long response time.
+        i.  Create a data set which contains the outcome variable
+          `over3d` and variables that might be useful in predicting it.
+          Consider including time-of-day effects (e.g., rush hour
+          vs. late-night), seasonal trends, and neighborhood-level
+          demographics. Zip code level information could be useful
+          too, such as the zip code
+         area and the ACS 2023 variables
+         (`data/nyc_zip_areas.feather` and
+         `data/acs2023.feather`).
+        i.  Randomly select 20% of the complaints as testing data with
+          seeds `1234`. Build a logistic model to predict `over3d` for
+          the complaints with the training data. If you
+          have tuning parameters, justify how they were selected.
+        i.  Construct the confusion matrix from your prediction with a
+          threshold of 1/2 on both training and testing
+          data. Explain your accuracy, recall, precision, and F1 score to a
+          New Yorker.
+        i. Construct the ROC curve of your fitted logistic model and
+          obtain the AUROC for both training and testing data. Explain your
+          results to a New Yorker.
+        i. Identify the most important predictors of `over3d`. Use model
+          coefficients or feature importance (e.g., odds ratios, standardized
+          coefficients, or SHAP values).
+        i. Summarize your results to a New Yorker who is not data
+           science savvy in several bullet points.
+    a.  Modeling the count of SF complains by zip code.
+        i.  Create a data set by aggregate the count of SF and SB
+           complains by day for each zipcode. 
+        i.  Merge the NYC precipitation (`data/rainfall_CP.csv`), 
+           by day to this data set.
+        i.  Merge the NYC zip code level landscape variables
+           (`data/nyc_zip_lands.csv`) and ACS 2023 variables into the
+           data set.
+		i. For each day, create two variables representing 1-day lag of the
+           precipitation and the number of CB complaints.
+        i. Filter data from March 1 to November 30, excluding winter
+           months when flooding is less frequent.
+           November 30. 
+        i.  Compare a Poisson regression with a Negative Binomial
+           regression to account for overdispersion. Which model fits better?
+           Explain the results to a New Yorker.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        i. Generate 'borough' variable using 'zip_code' variable.
+
+```{python}
+# Define the NYC borough boundary shapefile URL, the official nationwide shapefile for ZIP Code Tabulation Areas (ZCTAs) from the U.S. Census Bureau for the year 2023, and extraction directory
+shapefile_url = "https://www2.census.gov/geo/tiger/TIGER2023/ZCTA520/tl_2023_us_zcta520.zip"
+extract_dir = "ZIPCode_Shapefile"
+
+# Create the directory if it doesn't exist
+os.makedirs(extract_dir, exist_ok=True)
+
+# Step 2: Download and extract the ZIPCode_Shapefile
+print("Downloading ZIPCode shapefile...")
+response = requests.get(shapefile_url)
+with zipfile.ZipFile(io.BytesIO(response.content), "r") as z:
+    z.extractall(extract_dir)
+
+print(f"ZIPCode_Shapefile extracted to: {extract_dir}")
+```
+
+        i. Count the specific strings, like 'trains', 'manhattan', 'restaurants', 'restaurant', 'grocery', 'time square', 'subways', 'station', 'javits center', 'bars', 'clubs'
+
+```{python}
+for column in ['name', 'host_about', 'description', 'neighborhood_overview']:
+  # Check if the variable is missing occur
+  num_miss_rows = df_2024[column].isnull().sum()
+  print(f"There are {num_miss_rows} rows missing '{column}' value.")
+
+df_2024['description'].apply(lambda x: x.count('block away'))
+```
+
+        i. Convert 'has_availability' variable to binary ('t': 1 and 'f': 0)
+
+```{python}
+# Check if 'has_availability' is missing occur
+num_miss_has_availability = df_2024['has_availability'].isnull().sum()
+print(f"There are {num_miss_has_availability} rows missing 'has_availability' value.")
+
+# Convert 'has_availability' variable to integer ('t': 1 and 'f': 0)
+df_2024['has_availability'] = df_2024['has_availability'].map({'t': int(1), 'f': int(0)})
+
+# Check the number of unique values for 'has_availability' variable
+print(df_2024['has_availability'].value_counts(), '\n')
+```
+
+        i. Convert 'instant_bookable' variable to binary ('t': 1 and 'f': 0)
+
+```{python}
+# Check if 'instant_bookable' is missing occur
+num_miss_instant_bookable = df_2024['instant_bookable'].isnull().sum()
+print(f"There are {num_miss_instant_bookable} rows missing 'instant_bookable' value.")
+
+# Convert 'instant_bookable' variable to integer ('t': 1 and 'f': 0)
+df_2024['instant_bookable'] = df_2024['instant_bookable'].map({'t': 1, 'f': 0})
+
+# Check the number of unique values for 'has_availability' variable
+print(df_2024['instant_bookable'].value_counts(), '\n')
+```
+
+        i. Convert 'host_is_superhost' variable to binary ('t': 1 and 'f': 0)
+
+```{python}
+# Check if 'host_is_superhost' is missing occur
+num_miss_host_is_superhost = df_2024['host_is_superhost'].isnull().sum()
+print(f"There are {num_miss_host_is_superhost} rows missing 'host_is_superhost' value.")
+
+# Convert 'host_is_superhost' variable to integer ('t': 1 and 'f': 0)
+df_2024['host_is_superhost'] = df_2024['host_is_superhost'].map({'t': 1, 'f': 0})
+
+# Check the number of unique values for 'host_is_superhost' variable
+print(df_2024['host_is_superhost'].value_counts(), '\n')
+```
+
+        i. Convert 'picture_url',  'host_url', 'host_thumbnail_url'房东的大头照, 'host_picture_url'也是房东的大头照，variable to binary (not-null: 1 and null: 0). 
+
+```{python}
+# Convert 'picture_url',  'host_url', 'host_thumbnail_url', 'host_picture_url' variables to binary (not-null: 1 and null: 0), then drop the original columns
+url_columns = ['picture_url','host_url','host_thumbnail_url','host_picture_url']
+
+for column in url_columns:
+
+  # Check if the variable is missing occur
+  num_miss_rows = df_2024[column].isnull().sum()
+  print(f"There are {num_miss_rows} rows missing '{column}' value.")
+
+  # Convert the variable to integer (not-null: 1 and null: 0)
+  df_2024[column] = df_2024[column].apply(lambda x: 0 if pd.isnull(x) else 1)
+
+  # Check the number of unique values for the variable
+  print(df_2024[column].value_counts(), '\n')
+```
+
+        i. Remove the redundant variable 'property_type', since it provided the same information as the 'room_type' variable.
+
+```{python}
+# Drop the redundant variable 'property_type'
+df_2024 = df_2024.drop(columns=['property_type'])
+```
+
+        i. Remove all the rows with any missing values.
+
+```{python}
+# Check the infomation of the dataset, df_2024
+print(df_2024.info())
+
+# Remove all the rows with any missing values
+df_2024 = df_2024.dropna()
+
+# Check the shape of the dataset, df_2024, after removed all the rows with any missing values
+df_2024.shape
+```
+
+    i.  Merge the NYC zip code level landscape variables
+       (`data/nyc_zip_lands.csv`) and ACS 2023 variables into the
+       data set.
+
+```{python}
+# Display first few rows to check column names
+print(df_nyc_zip_lands.head(), '\n')
+
+# Check the data type of each column in the dataframe, df_nyc_zip_lands
+print(df_nyc_zip_lands.dtypes, '\n')
+
+# Merge the data set, 'df_nyc_zip_lands', by zipcode to the dataframe, df_final
+df_final = df_final.merge(
+  df_nyc_zip_lands, left_on='Zipcode', right_on='zipcode', how='left'
+  )
+
+# Display first few rows to check column names
+print(df_acs2023.head(), '\n')
+
+# Check the data type of each column in the dataframe, df_acs2023
+print(df_acs2023.dtypes, '\n')
+
+# Merge the data set, 'df_acs2023', by ZIP Code to the dataframe, df_final
+df_final = df_final.merge(
+  df_acs2023, left_on='Zipcode', right_on='ZIP Code', how='left'
+  )
+
+# Check for missing values
+print(df_final.isnull().sum(), '\n')
+
+# Check the dimension of the dataframe, df_final
+print(df_final.shape, '\n')
+
+# Check the data type of each column in the dataframe, df_final
+print(df_final.dtypes, '\n')
+
+# Display first few rows to check column names
+print(df_final.head(), '\n')
+```
+
+
+
+
+
+```{python}
+# Perform 10-fold CV on the best pipeline to report robust metrics
+cv_results = cross_validate(
+    best_model,
+    X, y,
+    cv=10,
+    scoring=('neg_mean_squared_error', 'r2'),
+    return_train_score=False
+)
+
+# Convert scores
+rmse_scores = np.sqrt(-cv_results['test_neg_mean_squared_error'])
+r2_scores = cv_results['test_r2']
+
+# Print average performance with std
+print(f"\n🔍 10-Fold Cross-Validation Results:")
+print(f"Average RMSE: {rmse_scores.mean():.2f} ± {rmse_scores.std():.2f}")
+print(f"Average R²  : {r2_scores.mean():.4f} ± {r2_scores.std():.4f}")
+```
+
+
+
+
+        
+        i. Build and train a MLR model to predict `price` for the listings with the 80% training data.
+
+```{python}
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+
+# Sample selection of columns
+df_MLR_model = df_2024_merged[['bathrooms', 'accommodates', 'room_type', 'borough', 'Median Household Income', 'minimum_nights', 'instant_bookable', 'bedrooms', 'property_type', 'host_about_sentiment', 'host_about_subjectivity', 'price']]
+
+# Check the dimension of the dataset, df_MLR_model
+print(df_MLR_model.shape)
+
+# Split the dataset into features (X) and target (y)
+X = df_MLR_model.drop(columns=['price'])  # Features
+y = np.log(df_MLR_model['price'])  # Target variable
+
+# List all of the numerical variables
+numerical_cols = [column for column in X.columns if df_MLR_model[column].dtypes != 'object']
+
+# List all of the categorical variables
+categorical_cols = [column for column in X.columns if column not in numerical_cols]
+
+# Define transformations for categorical variable
+categorical_transformer = OneHotEncoder(handle_unknown='ignore', drop='first')
+
+# Define transformations for continuous variables
+numerical_transformer = StandardScaler()
+
+# Use ColumnTransformer to transform the columns
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('cat', categorical_transformer, categorical_cols),
+        ('num', numerical_transformer, numerical_cols)
+    ]
+)
+
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=1234)
+
+# Define a pipeline model, which preprocess the data and then fits a XGBoost model.
+MLR_model = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('regressor', LinearRegression())
+])
+
+# Fit the model to the train dataset (X_train, y_train)
+MLR_model.fit(X_train, y_train)
+``` 
+
+```{python}
+# Predict 'price' on the test dataset
+y_pred = MLR_model.predict(X_test)
+
+# Compute MSE, RMSE and R²
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+r2 = r2_score(y_test, y_pred)
+
+# Print MLR Model performance
+print(f"MSE: {mse:.2f}")
+print(f"RMSE: {rmse:.2f}")
+print(f"R² Score: {r2:.4f}")
+```
+
+
+
+
+
+
+## Modeling Airbnb price of listings in NYC
+
+The XGBoost and Multiple linear regression (MLR) models were used in this project due to the large and complex dataset and the need for interpretability. Other than model evaluation and comparison, the XGBoost model also provided feature importance scores, which can be used to select the top 15 important predictors after encoding and standardizing the dataset. These selected variables were used to build the MLR model. The MLR model is an interpretable model that allows us to understand linear associations between predictors and the outcome (price), test the significance of variables, such as 'accommodates', 'room_type', and 'borough', and interpret the direction of the coefficients.
+
+
+
+
+## The top 11 important predictors
+
+The top 11 important predictors, found from the result of the XGBoost model, and the target, 'price', were used to build the MLR Model.
+
+
+
+
+
+
+```{python}
+# Step 4: Preprocessing setup
+numerical_cols = X.select_dtypes(include=['int64', 'float64']).columns
+categorical_cols = X.select_dtypes(include=['object', 'category']).columns
+
+numerical_transformer = StandardScaler()
+categorical_transformer = OneHotEncoder(drop='first', handle_unknown='ignore')
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', numerical_transformer, numerical_cols),
+        ('cat', categorical_transformer, categorical_cols)
+    ]
+)
+```
+
+
+
+
+```{python}
+# Add constant term (column: intercept=1), X.sm.add_constant()最好是在 preprocessing the data, OneHotEncoder(), 之前用因为statsmodels tries to be smart and skips it if it thinks a constant is already there。且sm.add_constant()最好在一个模型中只用一次。
+X = sm.add_constant(X)
+```
+
+
+
+
+
+
+        i. Method 2 to print the summary of the MRL model.
+
+```{python}
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Sample selection of columns
+df_XGBoot_model = df_2024_merged.drop(columns=['latitude', 'longitude', 'zip_code'])
+
+# Check the dimension of the dataset, df_XGBoot_model
+print(df_XGBoot_model.shape)
+
+# Split the dataset into features (X) and target (y)
+X = df_XGBoot_model.drop(columns=['price'])  # Features
+y = np.log1p(df_XGBoot_model['price'])  # Target variable
+
+# List all of the numerical variables
+numerical_cols = [column for column in X.columns if df_XGBoot_model[column].dtypes != 'object']
+
+# List all of the categorical variables
+categorical_cols = [column for column in X.columns if column not in numerical_cols]
+
+# Define transformations for categorical variable
+categorical_transformer = OneHotEncoder(handle_unknown='ignore', drop='first')
+
+# Define transformations for continuous variables
+numerical_transformer = StandardScaler()
+
+# Use ColumnTransformer to transform the columns
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('cat', categorical_transformer, categorical_cols),
+        ('num', numerical_transformer, numerical_cols)
+    ]
+)
+
+# Split the data into training and testing sets (在preprocessing the data 之前split train-test data，是因为standardizing，StandardScaler(), 是将数据集看作一个整体来进行standardizing 的。)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=1234)
+
+# Fit the preprocessor and transform X
+X_train = preprocessor.fit_transform(X_train) # fit_transform() on training data → calculate the mean and standard deviation from the training listings (training set).
+X_test = preprocessor.transform(X_test) # transform() on test data → Then, use those values (the mean and standard deviation from the training listings) to standardize listings from the testing listings (test set).
+# Don't recalculate the average/mean and std on the test set — that would bias the result.
+
+# Convert to DataFrame
+feature_names = preprocessor.get_feature_names_out()
+X_train = pd.DataFrame(X_train.toarray() if hasattr(X_train, 'toarray') else X_train,
+                    columns=feature_names)
+X_test = pd.DataFrame(X_test.toarray() if hasattr(X_test, 'toarray') else X_test,
+                    columns=feature_names)
+
+# Add constant AFTER preprocessing
+X_train = sm.add_constant(X_train)
+X_test = sm.add_constant(X_test)
+
+# Reindex test to match train column structure
+X_test = X_test.reindex(columns=X_train.columns, fill_value=0)
+
+# Reset index of y to match X (reset index 只是重新把所有的index改写成0，1，2，3......，而不会重新排列每一行的顺序；random slpit train-test data的时候不会改写每一行的index，所以split之后每一行的index是乱的是随机的是random select的每一行原本的index。)
+y_train = y_train.reset_index(drop=True)
+y_test = y_test.reset_index(drop=True)
+```
+
+```{python}
+# Fit/train the model on 80% training data
+MLR_model = sm.OLS(y_train, X_train).fit()
+
+# Print full summary of the MLR_model result
+print(MLR_model.summary())
+
+# Predict 'price' on the 20% test data
+y_pred = MLR_model.predict(X_test)
+
+# Compute MSE, RMSE and R²
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+r2 = r2_score(y_test, y_pred)
+
+# Print MLR Model performance
+print(f"MSE (on test data): {mse:.2f}")
+print(f"RMSE (on test data): {rmse:.2f}")
+print(f"R² Score: {r2:.4f}")
+```
+
+
+
+
+        i. Plot Cook's Distance for the OLS MLR model.
+
+```{python}
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+from statsmodels.stats.outliers_influence import OLSInfluence
+
+# Assume you already have a fitted OLS model called `MLR_model`
+influence = OLSInfluence(MLR_model)
+cooks_d = influence.cooks_distance[0]  # This returns a tuple (values, p-values), we take the values
+
+# Plot Cook's Distance
+plt.figure(figsize=(12, 6))
+plt.stem(np.arange(len(cooks_d)), cooks_d, markerfmt=",", use_line_collection=True)
+plt.xlabel('Observation Index')
+plt.ylabel("Cook's Distance")
+plt.title("Cook's Distance for Each Observation")
+plt.axhline(y=4 / len(cooks_d), color='r', linestyle='--', label='Threshold: 4/n')
+plt.legend()
+plt.show()
+```
+
+```{python}
+# See the Most Influential Observations
+influential_points = np.where(cooks_d > 4 / len(cooks_d))[0]
+print(f"Number of influential points: {len(influential_points)}")
+print("Top 5 influential indices:", influential_points[:5])
+```
+
+```{python}
+from statsmodels.graphics.regressionplots import plot_leverage_resid2
+
+# Plot leverage vs. residuals squared — Cook's Distance is shown by bubble size
+fig, ax = plt.subplots(figsize=(10, 6))
+plot_leverage_resid2(MLR_model, ax=ax)
+plt.title("Leverage vs. Residuals² with Cook’s Distance")
+plt.show()
+```
+
+
+
+# MLR model improvement:
+
+::: columns
+::: column
+![](Images/histogram_price.png){ width=60% }
+:::
+
+::: column
+![](Images/MLR_QQ_plot.png){ width=60% }
+:::
+:::
+
+![](Images/boxplot_price.png){ width=60% }
+
+
+![](Images/histogram_log(price).png){ width=60% }
+
+
+<img src="Images/histogram_log(price).png" width="45%" style="margin: 10px;">
+
+
+
+
+
+
+
+
+
+
+
+```{python}
+# Print the Pairwise Correlation Matrix
+corr_matrix = X.corr().abs()
+print(corr_matrix)
+
+# Find the Highly Correlated Predictors
+upper_triangle = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
+high_corr = [column for column in upper_triangle.columns if any(upper_triangle[column] >= 0.9)]
+print(high_corr)
+
+# Drop One of the Correlated Predictor from all of the Highly Correlated Predictor pairs
+X.drop(columns=high_corr, inplace=True)
+```
+
+
+
+
+
+
+---
+
+- Check for the multicollinearity problem in this MLR model.
+
+The Multicollinearity (VIF > 5) Table:
+
+| Feature                                       | VIF       |
+|----------------------------------------------|-----------|
+| borough_Bronx                                | inf       |
+| property_type_Entire serviced apartment      | inf       |
+| property_type_Private room in guesthouse     | inf       |
+| property_type_Private room in guest suite    | inf       |
+| property_type_Private room in condo          | inf       |
+| ...                                           | ...       |
+| reviews_per_month                            | 5.602504  |
+| availability_30                              | 5.513590  |
+| Asian Population                              | 5.386942  |
+| maximum_nights_avg_ntm                       | 5.346130  |
+| neighborhood_overview_count                  | 5.161551  |
+
+Conclusion: The Multicollinearity (VIF > 5) table shows that there are many predictors with a VIF value greater than 5, which indicates that there are strong multicollinearity problems in this MLR model. Therefore, Ridge Regression (L2), can be used to a regularisation technique, to improve this model, because the number of predictors is smaller than the number of observations.
+
+
+<img src="Images/histogram_log(price).png" width="45%" style="margin: 10px;">
+
+
+
+
+
+
+---
+
+- Run Tukey HSD test to examine whether average prices significantly differ between each pair of property types.
+
+::: columns
+::: column
+The result of the Tukey HSD test:
+
+<div style="text-align: center;">
+  <img src="Images/Tukey_test_property_types.png" style="width: 40%;" />
+</div>
+
+:::
+
+::: column
+The result of the One-Way ANOVA test:
+
+| Statistic     | Value   |
+|---------------|---------|
+| F-statistic   | 456.21 |
+| p-value       | 0.0000  |
+
+:::
+:::
+
+
+
+
+
+        i. Filter out the 'property_type' variable. 
+
+```{python}
+top_types = df_2024['property_type'].value_counts().head(14).index
+
+df_2024['property_type']
+```
+
+
+
+
+
+        i. Does the target, `price`, depende on different property types, `property_type`? (with Tukey HSD test)
+
+```{python}
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Filter out property types with very few listings if needed
+# top_types = df_2024['property_type'].value_counts().head(10).index
+filtered_df = df_2024
+
+filtered_df['log(price)'] = np.log1p(filtered_df['price'])
+
+plt.figure(figsize=(12, 6))
+sns.boxplot(data=filtered_df, x='property_type', y='log(price)')
+plt.xticks(rotation=90)
+plt.title('log(Price) Distribution by Property Type')
+plt.show()
+```
+
+```{python}
+import scipy.stats as stats
+
+# Use One-Way ANOVA to test if the mean price is significantly different across property types. 
+# If p < 0.05: There is a significant difference in price across property types. = Ha
+# If p >= 0.05: No significant difference detected. = H0
+
+
+# Filter out property types with very few listings if needed
+#top_types = df_2024['property_type'].value_counts().head(10).index
+filtered_df = df_2024
+
+# filtered_df['log(price)'] = np.log1p(filtered_df['price'])
+
+# Group prices by property_type
+groups = [group['price'].values for name, group in filtered_df.groupby("property_type")]
+
+# Run ANOVA
+f_stat, p_value = stats.f_oneway(*groups)
+print(f"F-statistic: {f_stat:.2f}, p-value: {p_value:.4f}")
+
+# Interpret results
+if p_value < 0.05:
+  print(f"Because the p-value ({p_value}) is smaller than alpha (0.05), we reject the null hypothesis. This indicates a significant difference in the target, `price`, between different property types. Therefore, we conclude that the target, `price`, depends on the different property types.")
+else:
+  print(f"Because the p-value ({p_value}) is greater than alpha (0.05), we fail to reject the null hypothesis. This indicates no significant difference in the target, `price`, between different property types. Therefore, we conclude that the target, `price`, is independent of the different property types.")
+```
+
+```{python}
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+
+# Step 1: Run Tukey HSD test to examine whether average prices significantly differ between each pair of property types.
+# Step 1: Run Tukey HSD test
+tukey_result = pairwise_tukeyhsd(endog=df_2024['price'], groups=df_2024['property_type'], alpha=0.05)
+
+# Step 2: Convert summary to a DataFrame
+tukey_df = pd.DataFrame(data=tukey_result._results_table.data[1:], columns=tukey_result._results_table.data[0])
+
+# Step 3: Filter rows where reject == True (i.e., significant)
+significant_diffs = tukey_df[tukey_df['reject'] == True]
+
+# Sort by mean difference (ascending)
+sorted_significant_diffs = significant_diffs.sort_values(by='meandiff', ascending=False)
+
+# Optional: Display the result
+print(sorted_significant_diffs.head(50))
+
+# Step: Get all unique property types that were in significant comparisons
+significant_groups = pd.unique(
+    pd.concat([sorted_significant_diffs['group1'], sorted_significant_diffs['group2']])
+)
+
+print(f"Total unique property types with significant price differences: {len(significant_groups)}")
+print(significant_groups)
+```
+
+
+
+
+
+
+## Data Exploratory Analysis
+
+- Does 'price' depende on 'popdensity_per_sq_mile' (number of people per square mile) ?
+
+The result of the SLR model (t-test):
+
+<div style="text-align: center;">
+  <img src="Images/SLR_popdensity_per_sq_mile.png" style="width: 60%;" />
+</div>
+
+Conclusion: **By applying an SLR model (t-test) to predict the target 'price' using the only predictor 'popdensity_per_sq_mile',** (we obtained a p-value of 0.0, which is extremely small, so we reject the null hypothesis. This indicates that there is a significant positive relationship between the target 'price' and the predictor 'popdensity_per_sq_mile'. Therefore, ) **we can conclude that the target, `price`, is dependent on the different 'popdensity_per_sq_mile' from the result.**
+
+---
+
+- Does the target, `price`, depende on `median_household_income`? 
+
+The result of the SLR model (t-test):
+
+<div style="text-align: center;">
+  <img src="Images/SLR_median_household_income.png" style="width: 60%;" />
+</div>
+
+Conclusion: **By applying an SLR model (t-test) to predict the target 'price' using the only predictor `median_household_income`,** (we obtained a p-value of 0.000, which is extremely small, so we reject the null hypothesis. This indicates that there is a significant positive relationship between the target 'price' and the predictor `median_household_income`. Therefore, ) **we can conclude that the target, `price`, is dependent on the predictor `median_household_income` from the result. So, we remove the different `median_household_income` from the dataset**
+
+---
+
+- Overlay the locations of the listings on a map of NYC and visualize the average price by zipcode on a NYC choropleth map [@nycMODZCTA2024]. 
+
+::: columns
+::: column
+![Figure: Overlay the geo codes locations of all the listings on the NYC map.](Images/Overlay_Listings_on_NYCmap.png){ width=60% }
+:::
+
+::: column
+![Figure: Visualize the average price by zipcode on a NYC choropleth map.](Images/ave_price_by_zipcode.png){ width=60% }
+:::
+:::
+
+Conclusion: From these two NYC map plot, we can see the zipcode area with more listings avaliable has a higher average price for the listings, especially high average price in the Manhattan borough.
+
+---
+
+- Does the target, `price`, depende on `num_listing_by_zipcode` (the number of listings in each zip_code area) ? (Check if there are more listings in the zip code area where the listing is located, the higher the 'price' of the listing.)
+
+The result of the SLR model (t-test):
+
+<div style="text-align: center;">
+  <img src="Images/num_listing_by_zipcode.png" style="width: 60%;" />
+</div>
+
+Conclusion: **By applying an SLR model (t-test) to predict the target 'price' using the only predictor `num_listing_by_zipcode`,** (we obtained a p-value of 0.0, which is extremely small, so we reject the null hypothesis. This indicates that there is a significant positive relationship between the target 'price' and the predictor `num_listing_by_zipcode`. Therefore, ) **we can conclude that the target, `price`, is dependent on the different `num_listing_by_zipcode` from the result.**
+
+---
+
+- Does the target, `price`, depende on the different boroughs? 
+
+::: columns
+::: column
+The boxplot of the log(price) distribution by broughs:
+
+<div style="text-align: center;">
+  <img src="Images/log(price)_by_boroughs.png" style="width: 40%;" />
+</div>
+
+:::
+
+::: column
+The result of the One-Way ANOVA test:
+
+| Statistic     | Value   |
+|---------------|---------|
+| F-statistic   | 2555.26 |
+| p-value       | 0.0000  |
+
+:::
+:::
+
+Conclusion: **By applying the one-way ANOVA test (stats.f_oneway()) to test whether the mean price is significantly different between boroughs,** (we obtained a p-value of 0.0, which is extremely small, so we reject the null hypothesis. This indicates that there is a significant difference in the target, `price`, between different boroughs. Therefore, ) **we conclude that the target, `price`, is dependent on the different boroughs from the result.** (We use a box plot of the distribution of log(price) by boroughs instead of the box plot of the distribution of price by boroughs because of the strong right skewness in the distribution of price.)
+
+---
+
+- Does the target, `price`, depende on different property types (`property_type`) ?
+
+::: columns
+::: column
+The boxplot of the log(price) distribution by property types:
+
+<div style="text-align: center;">
+  <img src="Images/boxplot_log(price)_by_property_type.png" style="width: 40%;" />
+</div>
+
+:::
+
+::: column
+The result of the One-Way ANOVA test:
+
+| Statistic     | Value   |
+|---------------|---------|
+| F-statistic   | 456.21 |
+| p-value       | 0.0000  |
+
+:::
+:::
+
+Conclusion: **By applying the one-way ANOVA test (stats.f_oneway()) to test whether the mean price is significantly different between property types,** (we obtained a p-value of 0.0, which is extremely small, so we reject the null hypothesis. This indicates that there is a significant difference in the target, `price`, between different property types. Therefore, ) **we can conclude that the target, `price`, is dependent on the different property types from the result.** (We use a box plot of the distribution of log(price) by property types instead of the box plot of the distribution of price by property types because of the strong right skewness in the distribution of price.) 
+
+---
+
+- Does the target, `price`, depende on different property types, `room_type`?
+
+::: columns
+::: column
+The boxplot of the log(price) distribution by room types:
+
+<div style="text-align: center;">
+  <img src="Images/boxplot_room_types.png" style="width: 40%;" />
+</div>
+
+:::
+
+::: column
+The result of the One-Way ANOVA test:
+
+| Statistic     | Value   |
+|---------------|---------|
+| F-statistic   | 4350.77 |
+| p-value       | 0.0000  |
+
+:::
+:::
+
+Conclusion: **By applying the one-way ANOVA test (stats.f_oneway()) to test whether the mean price is significantly different between room types,** (we obtained a p-value of 0.0, which is extremely small, so we reject the null hypothesis. This indicates that there is a significant difference in the target, `price`, between different room types. Therefore, ) **we can conclude that the target, `price`, is dependent on the different room types from the result.** (We use a box plot of the distribution of log(price) by room types instead of the box plot of the distribution of price by room types because of the strong right skewness in the distribution of price.) 
+
+---
+
+- Does the target, `price`, depende on the `host_response_time`?
+
+::: columns
+::: column
+The boxplot of the log(price) distribution by property types:
+
+<div style="text-align: center;">
+  <img src="Images/boxplot_host_respponse_time.png" style="width: 40%;" />
+</div>
+
+:::
+
+::: column
+The result of the One-Way ANOVA test:
+
+| Statistic     | Value   |
+|---------------|---------|
+| F-statistic   | 356.10 |
+| p-value       | 0.0000  |
+
+:::
+:::
+
+Conclusion: **By applying the one-way ANOVA test (stats.f_oneway()) to test whether the mean price is significantly different between the different `host_response_time`,** (we obtained a p-value of 0.0, which is extremely small, so we reject the null hypothesis. This indicates that there is a significant difference in the target, `price`, between the different `host_response_time`. Therefore, ) **we can conclude that the target, `price`, is dependent on the different `host_response_time` from the result.** (Even though the differences between the groups look small visually in the boxplot, the one-way ANOVA detected a statistically significant difference because, with a large dataset, even very small differences in means can become statistically significant. We use a box plot of the distribution of log(price) by `host_response_time` instead of the box plot of the distribution of price by `host_response_time` because of the strong right skewness in the distribution of price.) 

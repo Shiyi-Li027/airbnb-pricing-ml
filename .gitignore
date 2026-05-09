@@ -1,0 +1,41 @@
+# Large datasets
+data/
+*.feather
+*.zip
+*.xlsx
+*.csv
+
+!sample_data/
+!sample_data/*.csv
+
+# Shapefiles
+MODZCTA_Shapefile/
+US_ZIPCode_Shapefile/
+ZIPCode_Shapefile/
+*.shp
+*.dbf
+*.shx
+*.prj
+*.cpg
+
+
+# Render outputs
+presentation/presentation_slides_files/
+*.html
+
+# Cache
+__pycache__/
+.ipynb_checkpoints/
+
+# Mac
+.DS_Store
+
+# Temporary Office files
+~$*
+
+# Secrets files
+*censusAPIkey*
+
+
+
+
